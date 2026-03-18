@@ -1041,6 +1041,21 @@
     <input type="text" id="sessionNameInput" placeholder="Nom de la session (ex: Trimestre 1 2025)…" onkeydown="if(event.key==='Enter') saveSession()">
     <button class="btn btn-gold btn-sm" onclick="saveSession()" style="white-space:nowrap;">💾 Sauvegarder</button>
   </div>
+
+  <!-- INFO STOCKAGE -->
+  <div style="margin: 0; padding: 12px 16px; background: rgba(74,85,104,0.06); border-bottom: 1px solid var(--mist); font-size: 0.75rem; color: var(--slate); line-height: 1.6;">
+    <div style="font-weight: 700; color: var(--ink); margin-bottom: 6px; font-size: 0.78rem;">📍 Où sont stockées vos sessions ?</div>
+    <div style="display:flex; flex-direction:column; gap:4px;">
+      <div style="display:flex; gap:6px; align-items:flex-start;"><span style="color:var(--forest); font-weight:700; flex-shrink:0;">✓</span><span>Stockées dans <strong>votre navigateur</strong>, sur <strong>cet ordinateur uniquement</strong>.</span></div>
+      <div style="display:flex; gap:6px; align-items:flex-start;"><span style="color:var(--forest); font-weight:700; flex-shrink:0;">✓</span><span>Conservées même après fermeture du site ou redémarrage.</span></div>
+      <div style="display:flex; gap:6px; align-items:flex-start;"><span style="color:var(--rust); font-weight:700; flex-shrink:0;">✗</span><span>Non disponibles sur un autre navigateur ou un autre PC.</span></div>
+      <div style="display:flex; gap:6px; align-items:flex-start;"><span style="color:var(--rust); font-weight:700; flex-shrink:0;">✗</span><span>Effacées si vous videz le cache du navigateur.</span></div>
+    </div>
+    <div style="margin-top:8px; padding-top:8px; border-top:1px solid var(--mist); color:var(--slate);">
+      💡 Pour partager un planning avec un collègue, utilisez les exports <strong>PDF / Excel / Word</strong> disponibles en bas du planning.
+    </div>
+  </div>
+
   <div class="drawer-body" id="sessionList">
     <div class="empty-state" style="padding:40px 20px;">
       <div class="big-icon">🗂️</div>
@@ -1227,15 +1242,35 @@
     <h2 class="section-title"><span class="icon icon-rust">⚠️</span> Contraintes horaires</h2>
 
     <div class="alert alert-info">
-      ℹ️ Définissez ici les indisponibilités des professeurs. Ces contraintes seront respectées lors de la génération du planning.
+      ℹ️ Définissez ici les indisponibilités des <strong>professeurs</strong> ou des <strong>classes</strong>. Ces contraintes seront respectées lors de la génération du planning.
     </div>
 
     <div class="card">
       <div class="card-title"><span class="icon icon-rust">➕</span> Ajouter une contrainte</div>
+
+      <!-- Target type toggle -->
+      <label>Contrainte pour</label>
+      <div style="display:flex; gap:8px; margin-bottom:14px;">
+        <button id="ctTargetProf" onclick="setConstraintTarget('prof')"
+          style="flex:1; padding:9px; border-radius:8px; border:1.5px solid var(--forest); background:var(--forest); color:white; font-weight:600; font-size:0.85rem; cursor:pointer; transition:all 0.2s;">
+          👤 Un professeur
+        </button>
+        <button id="ctTargetClass" onclick="setConstraintTarget('class')"
+          style="flex:1; padding:9px; border-radius:8px; border:1.5px solid var(--mist); background:var(--white); color:var(--slate); font-weight:600; font-size:0.85rem; cursor:pointer; transition:all 0.2s;">
+          🏫 Une classe
+        </button>
+      </div>
+
       <div class="row">
-        <div>
+        <div id="ctProfField">
           <label>Professeur</label>
           <select id="constraintProf">
+            <option value="">-- Sélectionner --</option>
+          </select>
+        </div>
+        <div id="ctClassField" style="display:none;">
+          <label>Classe</label>
+          <select id="constraintClass">
             <option value="">-- Sélectionner --</option>
           </select>
         </div>
@@ -1592,13 +1627,32 @@ function renderClasses() {
 }
 
 // ===================== CONSTRAINTS =====================
+let constraintTarget = 'prof'; // 'prof' or 'class'
+
+function setConstraintTarget(target) {
+  constraintTarget = target;
+  const isProf = target === 'prof';
+  document.getElementById('ctProfField').style.display = isProf ? 'block' : 'none';
+  document.getElementById('ctClassField').style.display = isProf ? 'none' : 'block';
+  document.getElementById('ctTargetProf').style.background = isProf ? 'var(--forest)' : 'var(--white)';
+  document.getElementById('ctTargetProf').style.color = isProf ? 'white' : 'var(--slate)';
+  document.getElementById('ctTargetProf').style.borderColor = isProf ? 'var(--forest)' : 'var(--mist)';
+  document.getElementById('ctTargetClass').style.background = isProf ? 'var(--white)' : 'var(--rust)';
+  document.getElementById('ctTargetClass').style.color = isProf ? 'var(--slate)' : 'white';
+  document.getElementById('ctTargetClass').style.borderColor = isProf ? 'var(--mist)' : 'var(--rust)';
+}
+
 function updateConstraintOptions() {
   const profSel = document.getElementById('constraintProf');
+  const classSel = document.getElementById('constraintClass');
   const dateSel = document.getElementById('constraintDate');
   const allProfs = getAllProfs();
 
   profSel.innerHTML = '<option value="">-- Sélectionner --</option>' +
     allProfs.map(p => `<option value="${p}">${p}</option>`).join('');
+
+  classSel.innerHTML = '<option value="">-- Sélectionner --</option>' +
+    data.classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
 
   dateSel.innerHTML = '<option value="">-- Sélectionner une date --</option>' +
     data.dates.map(d => `<option value="${d.id}">${formatDate(d.date)} (${d.timeStart}–${d.timeEnd})</option>`).join('');
@@ -1610,11 +1664,10 @@ function updateConstraintUI() {
 }
 
 function addConstraint() {
-  const prof = document.getElementById('constraintProf').value;
   const type = document.getElementById('constraintType').value;
   const dateId = document.getElementById('constraintDate').value;
 
-  if (!prof || !dateId) { alert('Veuillez sélectionner un professeur et une date.'); return; }
+  if (!dateId) { alert('Veuillez sélectionner une date.'); return; }
 
   let from = null, to = null;
   if (type === 'range') {
@@ -1625,7 +1678,18 @@ function addConstraint() {
   }
 
   const dateObj = data.dates.find(d => d.id === dateId);
-  data.constraints.push({ id: uid(), prof, type, dateId, date: dateObj.date, from, to });
+
+  if (constraintTarget === 'prof') {
+    const prof = document.getElementById('constraintProf').value;
+    if (!prof) { alert('Veuillez sélectionner un professeur.'); return; }
+    data.constraints.push({ id: uid(), target: 'prof', prof, type, dateId, date: dateObj.date, from, to });
+  } else {
+    const classId = document.getElementById('constraintClass').value;
+    if (!classId) { alert('Veuillez sélectionner une classe.'); return; }
+    const classObj = data.classes.find(c => c.id === classId);
+    data.constraints.push({ id: uid(), target: 'class', classId, className: classObj.name, type, dateId, date: dateObj.date, from, to });
+  }
+
   renderConstraints();
 }
 
@@ -1640,18 +1704,53 @@ function renderConstraints() {
     el.innerHTML = '<div class="empty-state"><div class="big-icon">⚠️</div><p>Aucune contrainte définie.</p></div>';
     return;
   }
-  el.innerHTML = data.constraints.map(c => {
-    const desc = c.type === 'day'
-      ? `Toute la journée`
-      : `De ${c.from} à ${c.to}`;
-    return `<div class="constraint-item">
-      <div class="constraint-info">
-        <strong>👤 ${c.prof}</strong> —
-        <span>indisponible le ${formatDate(c.date)} : ${desc}</span>
-      </div>
-      <button class="btn btn-danger btn-sm" onclick="removeConstraint('${c.id}')">✕</button>
-    </div>`;
-  }).join('');
+
+  // Group by type for readability
+  const profConstraints = data.constraints.filter(c => !c.target || c.target === 'prof');
+  const classConstraints = data.constraints.filter(c => c.target === 'class');
+
+  let html = '';
+
+  if (profConstraints.length) {
+    html += `<div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--slate); margin-bottom:8px; margin-top:4px;">👤 Professeurs</div>`;
+    html += profConstraints.map(c => {
+      const desc = c.type === 'day' ? 'Toute la journée' : `De ${c.from} à ${c.to}`;
+      return `<div class="constraint-item">
+        <div class="constraint-info">
+          <strong>👤 ${c.prof}</strong> —
+          <span>indisponible le ${formatDate(c.date)} : ${desc}</span>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="removeConstraint('${c.id}')">✕</button>
+      </div>`;
+    }).join('');
+  }
+
+  if (classConstraints.length) {
+    html += `<div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--slate); margin-bottom:8px; margin-top:14px;">🏫 Classes</div>`;
+    html += classConstraints.map(c => {
+      const desc = c.type === 'day' ? 'Toute la journée' : `De ${c.from} à ${c.to}`;
+      return `<div class="constraint-item" style="border-left-color: var(--forest);">
+        <div class="constraint-info">
+          <strong>🏫 ${c.className}</strong> —
+          <span>indisponible le ${formatDate(c.date)} : ${desc}</span>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="removeConstraint('${c.id}')">✕</button>
+      </div>`;
+    }).join('');
+  }
+
+  el.innerHTML = html;
+}
+
+// Check if a CLASS is blocked at a given date/slot
+function isClassBlocked(classId, dateId, slotStart, slotEnd) {
+  return data.constraints.some(c => {
+    if (c.target !== 'class' || c.classId !== classId || c.dateId !== dateId) return false;
+    if (c.type === 'day') return true;
+    const cFrom = timeToMinutes(c.from);
+    const cTo = timeToMinutes(c.to);
+    return slotStart < cTo && slotEnd > cFrom;
+  });
 }
 
 // ===================== MATIERES SELECTOR =====================
@@ -1808,6 +1907,9 @@ function generateSchedule() {
     // Hard penalty if date is full
     if (countPerDate[dateId] >= maxPerDay) score += 10000;
 
+    // Hard penalty if the CLASS itself is blocked on this date/slot
+    if (isClassBlocked(classObj.id, dateId, slot.start, slot.end)) score += 5000;
+
     activeProfs.forEach(p => {
       if (isProfBlocked(p, dateId, slot.start, slot.end)) score += 100;
       if (isProfBusy(p, dateId, slotIdx)) score += 10;
@@ -1867,15 +1969,18 @@ function generateSchedule() {
 function detectConflicts() {
   const conflicts = [];
   data.schedule.forEach(s => {
+    // Prof conflicts
     s.profs.forEach(p => {
-      // busy conflict
       const others = data.schedule.filter(o => o.id !== s.id && o.dateId === s.dateId && o.slotIndex === s.slotIndex && o.profs.includes(p));
       if (others.length) conflicts.push({ scheduleId: s.id, prof: p, reason: `Conflit avec ${others.map(o=>o.className).join(', ')}` });
-      // constraint conflict
       if (isProfBlocked(p, s.dateId, s.slotStart, s.slotEnd)) {
         conflicts.push({ scheduleId: s.id, prof: p, reason: `Indisponibilité déclarée` });
       }
     });
+    // Class constraint conflicts
+    if (isClassBlocked(s.classId, s.dateId, s.slotStart, s.slotEnd)) {
+      conflicts.push({ scheduleId: s.id, prof: `Classe ${s.className}`, reason: `Indisponibilité de classe` });
+    }
   });
   return conflicts;
 }
