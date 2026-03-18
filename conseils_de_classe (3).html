@@ -1,0 +1,2711 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planificateur de Conseils de Classe</title>
+<!-- Bibliothèques intégrées localement pour conformité RGPD - voir README -->
+<script src="xlsx.full.min.js"></script>
+<script src="jspdf.umd.min.js"></script>
+<script src="html2canvas.min.js"></script>
+<style>
+  :root {
+    --ink: #1a1a2e;
+    --paper: #f5f0e8;
+    --cream: #ede8dc;
+    --gold: #c9a84c;
+    --gold-light: #e8d5a3;
+    --rust: #c0503a;
+    --forest: #2d6a4f;
+    --forest-light: #52b788;
+    --slate: #4a5568;
+    --mist: #e2ddd6;
+    --white: #fdfaf5;
+    --shadow: rgba(26,26,46,0.12);
+    --radius: 10px;
+    --radius-lg: 18px;
+    --font-display: 'Georgia', 'Times New Roman', serif;
+    --font-body: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--paper);
+    color: var(--ink);
+    min-height: 100vh;
+    background-image:
+      radial-gradient(circle at 20% 50%, rgba(201,168,76,0.06) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(45,106,79,0.05) 0%, transparent 40%);
+  }
+
+  header {
+    background: var(--ink);
+    color: var(--paper);
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    border-bottom: 3px solid var(--gold);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 4px 20px var(--shadow);
+  }
+
+  header .logo {
+    font-family: var(--font-display);
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  header .logo span { color: var(--gold); }
+
+  header .subtitle {
+    font-size: 0.8rem;
+    color: var(--gold-light);
+    font-weight: 300;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  .tab-btn {
+    background: transparent;
+    border: 1.5px solid rgba(201,168,76,0.3);
+    color: var(--gold-light);
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 0.82rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    transition: all 0.2s;
+  }
+
+  .tab-btn:hover, .tab-btn.active {
+    background: var(--gold);
+    color: var(--ink);
+    border-color: var(--gold);
+  }
+
+  .main {
+    max-width: 1300px;
+    margin: 0 auto;
+    padding: 30px 30px 80px 30px;
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--mist);
+  }
+
+  /* PANELS */
+  .panel {
+    display: none;
+    animation: fadeIn 0.3s ease;
+  }
+  .panel.active { display: block; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  /* CARDS */
+  .card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    padding: 28px;
+    margin-bottom: 24px;
+    border: 1px solid var(--mist);
+    box-shadow: 0 2px 12px var(--shadow);
+  }
+
+  .card-title {
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin-bottom: 18px;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .icon {
+    width: 28px; height: 28px;
+    border-radius: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .icon-gold { background: rgba(201,168,76,0.15); color: var(--gold); }
+  .icon-forest { background: rgba(45,106,79,0.12); color: var(--forest); }
+  .icon-rust { background: rgba(192,80,58,0.12); color: var(--rust); }
+  .icon-slate { background: rgba(74,85,104,0.1); color: var(--slate); }
+
+  /* FORMS */
+  label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--slate);
+    margin-bottom: 6px;
+    margin-top: 14px;
+  }
+  label:first-child { margin-top: 0; }
+
+  input[type="text"], input[type="date"], input[type="time"], select, textarea {
+    width: 100%;
+    padding: 10px 14px;
+    border: 1.5px solid var(--mist);
+    border-radius: var(--radius);
+    font-family: var(--font-body);
+    font-size: 0.9rem;
+    background: var(--paper);
+    color: var(--ink);
+    transition: border 0.2s, box-shadow 0.2s;
+    outline: none;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(201,168,76,0.15);
+  }
+
+  .row { display: flex; gap: 14px; align-items: flex-end; }
+  .row > * { flex: 1; }
+
+  /* BUTTONS */
+  .btn {
+    padding: 10px 22px;
+    border: none;
+    border-radius: var(--radius);
+    font-family: var(--font-body);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    letter-spacing: 0.3px;
+  }
+
+  .btn-primary {
+    background: var(--ink);
+    color: var(--white);
+  }
+  .btn-primary:hover { background: #2d2d50; box-shadow: 0 4px 12px var(--shadow); transform: translateY(-1px); }
+
+  .btn-gold {
+    background: var(--gold);
+    color: var(--ink);
+  }
+  .btn-gold:hover { background: #b8963e; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(201,168,76,0.3); }
+
+  .btn-forest {
+    background: var(--forest);
+    color: white;
+  }
+  .btn-forest:hover { background: #235740; transform: translateY(-1px); }
+
+  .btn-danger {
+    background: rgba(192,80,58,0.1);
+    color: var(--rust);
+    border: 1px solid rgba(192,80,58,0.2);
+    padding: 6px 12px;
+    font-size: 0.78rem;
+  }
+  .btn-danger:hover { background: var(--rust); color: white; }
+
+  .btn-sm { padding: 6px 14px; font-size: 0.8rem; }
+
+  /* TAGS */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 500;
+    background: var(--cream);
+    color: var(--ink);
+    border: 1px solid var(--mist);
+    margin: 3px;
+  }
+  .tag .remove {
+    cursor: pointer;
+    color: var(--slate);
+    font-weight: 700;
+    font-size: 0.9rem;
+    line-height: 1;
+  }
+  .tag .remove:hover { color: var(--rust); }
+
+  /* DATE LIST */
+  .date-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--cream);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    border-left: 3px solid var(--gold);
+  }
+  .date-item .date-info { display: flex; flex-direction: column; gap: 2px; }
+  .date-item .date-name { font-weight: 600; font-size: 0.9rem; }
+  .date-item .date-sub { font-size: 0.78rem; color: var(--slate); }
+
+  /* CLASS LIST */
+  .class-item {
+    background: var(--cream);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    border-left: 3px solid var(--forest);
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    justify-content: space-between;
+  }
+  .class-item .class-info { flex: 1; }
+  .class-item .class-name { font-weight: 700; font-size: 1rem; margin-bottom: 6px; }
+  .class-item .profs-list { display: flex; flex-wrap: wrap; gap: 4px; }
+  .prof-tag {
+    background: rgba(45,106,79,0.1);
+    color: var(--forest);
+    border: 1px solid rgba(45,106,79,0.2);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  /* CONSTRAINT LIST */
+  .constraint-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--cream);
+    border-radius: var(--radius);
+    margin-bottom: 8px;
+    border-left: 3px solid var(--rust);
+  }
+  .constraint-info { font-size: 0.85rem; }
+  .constraint-info strong { color: var(--ink); }
+  .constraint-info span { color: var(--slate); }
+
+  /* SCHEDULE GRID */
+  #schedulePanel { }
+
+  .schedule-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+
+  .schedule-table-wrapper { overflow-x: auto; }
+
+  .schedule-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.83rem;
+  }
+
+  .schedule-table th {
+    background: var(--ink);
+    color: var(--gold-light);
+    padding: 12px 10px;
+    font-weight: 600;
+    text-align: center;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    position: sticky;
+    top: 0;
+  }
+  .schedule-table th:first-child { border-radius: 10px 0 0 0; }
+  .schedule-table th:last-child { border-radius: 0 10px 0 0; }
+
+  .schedule-table td {
+    padding: 8px 6px;
+    border: 1px solid var(--mist);
+    vertical-align: top;
+    background: var(--white);
+    min-width: 130px;
+    min-height: 60px;
+  }
+
+  .schedule-table tr:last-child td:first-child { border-radius: 0 0 0 10px; }
+  .schedule-table tr:last-child td:last-child { border-radius: 0 0 10px 0; }
+
+  .slot-label {
+    text-align: center;
+    font-weight: 700;
+    background: var(--cream);
+    color: var(--slate);
+    font-size: 0.78rem;
+    padding: 10px;
+    min-width: 90px;
+    border: 1px solid var(--mist);
+  }
+
+  .conseil-block {
+    background: linear-gradient(135deg, rgba(45,106,79,0.12), rgba(82,183,136,0.08));
+    border: 1.5px solid rgba(45,106,79,0.3);
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin: 2px;
+    cursor: grab;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .conseil-block:hover { box-shadow: 0 4px 14px rgba(45,106,79,0.25); transform: translateY(-1px); z-index: 10; }
+  .conseil-block.dragging { opacity: 0.5; cursor: grabbing; }
+
+  .conseil-block .class-label {
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: var(--forest);
+    margin-bottom: 4px;
+  }
+  .conseil-block .profs-preview {
+    font-size: 0.7rem;
+    color: var(--slate);
+    line-height: 1.4;
+  }
+
+  .conseil-block.conflict {
+    background: linear-gradient(135deg, rgba(192,80,58,0.12), rgba(192,80,58,0.05));
+    border-color: rgba(192,80,58,0.4);
+  }
+  .conseil-block.conflict .class-label { color: var(--rust); }
+
+  .drop-zone {
+    min-height: 50px;
+    border-radius: 8px;
+    transition: background 0.2s;
+  }
+  .drop-zone.drag-over {
+    background: rgba(201,168,76,0.12);
+    border: 2px dashed var(--gold);
+  }
+
+  /* LEGEND */
+  .legend {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: var(--slate);
+  }
+  .legend-dot {
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  /* MOVE MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(26,26,46,0.5);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+    animation: fadeIn 0.2s ease;
+  }
+  .modal {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    padding: 32px;
+    width: min(560px, 90vw);
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(26,26,46,0.3);
+    border: 1px solid var(--mist);
+    animation: slideUp 0.3s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  .modal-title {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .modal-close {
+    background: none;
+    border: none;
+    font-size: 1.3rem;
+    cursor: pointer;
+    color: var(--slate);
+    line-height: 1;
+  }
+  .modal-close:hover { color: var(--rust); }
+
+  /* AVAILABILITY */
+  .availability-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 16px 0;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+  .avail-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--cream);
+    font-size: 0.85rem;
+  }
+  .avail-row .avail-name { flex: 1; font-weight: 500; }
+  .avail-ok { color: var(--forest); font-size: 0.82rem; display: flex; align-items: center; gap: 4px; }
+  .avail-conflict { color: var(--rust); font-size: 0.82rem; display: flex; align-items: center; gap: 4px; }
+
+  .slot-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius);
+    border: 1.5px solid var(--mist);
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--paper);
+  }
+  .slot-option:hover { border-color: var(--gold); background: rgba(201,168,76,0.05); }
+  .slot-option.selected { border-color: var(--forest); background: rgba(45,106,79,0.06); }
+  .slot-option-info { flex: 1; }
+  .slot-option-name { font-weight: 600; font-size: 0.88rem; }
+  .slot-option-sub { font-size: 0.75rem; color: var(--slate); }
+  .slot-status { font-size: 0.75rem; font-weight: 600; }
+  .status-ok { color: var(--forest); }
+  .status-warn { color: #d97706; }
+  .status-bad { color: var(--rust); }
+
+  /* ALERTS */
+  .alert {
+    padding: 12px 16px;
+    border-radius: var(--radius);
+    font-size: 0.85rem;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .alert-success { background: rgba(45,106,79,0.1); color: var(--forest); border: 1px solid rgba(45,106,79,0.2); }
+  .alert-warn { background: rgba(201,168,76,0.12); color: #92680a; border: 1px solid rgba(201,168,76,0.3); }
+  .alert-error { background: rgba(192,80,58,0.1); color: var(--rust); border: 1px solid rgba(192,80,58,0.2); }
+  .alert-info { background: rgba(74,85,104,0.08); color: var(--slate); border: 1px solid var(--mist); }
+
+  /* STATS */
+  .stats-bar {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .stat-chip {
+    background: var(--cream);
+    border: 1px solid var(--mist);
+    border-radius: var(--radius);
+    padding: 10px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stat-chip .stat-val { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; color: var(--ink); }
+  .stat-chip .stat-lab { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: var(--slate); }
+
+  /* EMPTY STATE */
+  .empty-state {
+    text-align: center;
+    padding: 50px 20px;
+    color: var(--slate);
+  }
+  .empty-state .big-icon { font-size: 3rem; margin-bottom: 14px; }
+  .empty-state p { font-size: 0.9rem; }
+
+  /* RESPONSIVE */
+  @media (max-width: 768px) {
+    header { padding: 14px 20px; flex-wrap: wrap; gap: 10px; }
+    .tabs { width: 100%; overflow-x: auto; }
+    .main { padding: 20px 16px; }
+    .row { flex-direction: column; gap: 0; }
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--cream); }
+  ::-webkit-scrollbar-thumb { background: var(--mist); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--gold-light); }
+
+  /* DURATION BADGE */
+  .duration-badge {
+    display: inline-block;
+    background: rgba(74,85,104,0.1);
+    color: var(--slate);
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+
+  .time-range-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  .checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--ink);
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1.5px solid var(--mist);
+    background: var(--paper);
+    transition: all 0.15s;
+    margin-top: 0;
+  }
+  .checkbox-label:hover { border-color: var(--gold); }
+  .checkbox-label input { width: auto; }
+
+  /* EXCEL IMPORT */
+  .drop-excel {
+    border: 2.5px dashed var(--gold-light);
+    border-radius: var(--radius-lg);
+    background: rgba(201,168,76,0.04);
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .drop-excel:hover, .drop-excel.drag-active {
+    border-color: var(--gold);
+    background: rgba(201,168,76,0.09);
+  }
+  .drop-excel input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .drop-excel .drop-icon { font-size: 2.2rem; margin-bottom: 10px; }
+  .drop-excel .drop-text { font-size: 0.9rem; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+  .drop-excel .drop-sub { font-size: 0.75rem; color: var(--slate); }
+
+  .preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+    margin-top: 12px;
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .preview-table th {
+    background: var(--ink);
+    color: var(--gold-light);
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .preview-table td {
+    padding: 7px 12px;
+    border-bottom: 1px solid var(--mist);
+    background: var(--white);
+  }
+  .preview-table tr:last-child td { border-bottom: none; }
+  .preview-table tr:hover td { background: var(--cream); }
+  .preview-table .col-class { font-weight: 700; color: var(--forest); }
+
+  .format-hint {
+    background: var(--cream);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    font-size: 0.78rem;
+    color: var(--slate);
+    margin-bottom: 16px;
+    border-left: 3px solid var(--gold);
+    line-height: 1.6;
+  }
+  .format-hint code {
+    background: rgba(26,26,46,0.08);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: monospace;
+    font-size: 0.82rem;
+    color: var(--ink);
+  }
+  .format-hint table {
+    margin-top: 8px;
+    border-collapse: collapse;
+    font-size: 0.76rem;
+  }
+  .format-hint table td, .format-hint table th {
+    border: 1px solid var(--mist);
+    padding: 4px 10px;
+    background: var(--white);
+  }
+  .format-hint table th { background: var(--ink); color: var(--gold-light); }
+
+  /* EXPORT BAR */
+  .export-bar {
+    background: var(--ink);
+    border-radius: var(--radius-lg);
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+    border: 1px solid rgba(201,168,76,0.2);
+  }
+  .export-bar .export-label {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    color: var(--gold-light);
+    font-weight: 600;
+    margin-right: 6px;
+    white-space: nowrap;
+  }
+  .btn-export {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    border-radius: var(--radius);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .btn-export:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.25); }
+  .btn-export-pdf  { background: #e53e3e; color: white; }
+  .btn-export-xlsx { background: #276749; color: white; }
+  .btn-export-word { background: #2b6cb0; color: white; }
+  .btn-export-pdf:hover  { background: #c53030; }
+  .btn-export-xlsx:hover { background: #1e5239; }
+  .btn-export-word:hover { background: #2c5282; }
+
+  .export-spinner {
+    display: none;
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== SESSIONS ===== */
+  .session-btn {
+    background: rgba(201,168,76,0.15);
+    border: 1.5px solid rgba(201,168,76,0.35);
+    color: var(--gold-light);
+    padding: 7px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .session-btn:hover { background: rgba(201,168,76,0.28); border-color: var(--gold); color: var(--gold); }
+
+  .session-drawer {
+    position: fixed;
+    top: 0; right: -420px;
+    width: 400px;
+    height: 100vh;
+    background: var(--white);
+    border-left: 1px solid var(--mist);
+    box-shadow: -8px 0 40px rgba(26,26,46,0.18);
+    z-index: 500;
+    transition: right 0.35s cubic-bezier(.4,0,.2,1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .session-drawer.open { right: 0; }
+
+  .drawer-header {
+    background: var(--ink);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--gold);
+    flex-shrink: 0;
+  }
+  .drawer-header h3 {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    color: var(--gold-light);
+    font-weight: 600;
+  }
+  .drawer-close {
+    background: none; border: none;
+    color: var(--gold-light); font-size: 1.3rem;
+    cursor: pointer; line-height: 1;
+    transition: color 0.15s;
+  }
+  .drawer-close:hover { color: var(--rust); }
+
+  .drawer-save {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--mist);
+    background: var(--cream);
+    flex-shrink: 0;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .drawer-save input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1.5px solid var(--mist);
+    border-radius: 8px;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    background: var(--white);
+    color: var(--ink);
+    outline: none;
+  }
+  .drawer-save input:focus { border-color: var(--gold); }
+
+  .drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+
+  .session-item {
+    background: var(--paper);
+    border: 1.5px solid var(--mist);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    transition: border-color 0.2s;
+    cursor: pointer;
+  }
+  .session-item:hover { border-color: var(--gold); background: rgba(201,168,76,0.04); }
+  .session-item.active-session { border-color: var(--forest); background: rgba(45,106,79,0.05); }
+
+  .session-item-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .session-name {
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: var(--ink);
+    flex: 1;
+  }
+  .session-actions { display: flex; gap: 5px; flex-shrink: 0; }
+  .session-action-btn {
+    background: none;
+    border: 1px solid var(--mist);
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-size: 0.72rem;
+    cursor: pointer;
+    color: var(--slate);
+    transition: all 0.15s;
+    font-family: var(--font-body);
+  }
+  .session-action-btn:hover { background: var(--cream); }
+  .session-action-btn.load  { color: var(--forest); border-color: rgba(45,106,79,0.3); }
+  .session-action-btn.load:hover  { background: rgba(45,106,79,0.08); }
+  .session-action-btn.del   { color: var(--rust); border-color: rgba(192,80,58,0.3); }
+  .session-action-btn.del:hover   { background: rgba(192,80,58,0.08); }
+
+  .session-meta {
+    font-size: 0.72rem;
+    color: var(--slate);
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .session-meta span { display: flex; align-items: center; gap: 3px; }
+
+  .drawer-overlay {
+    position: fixed; inset: 0;
+    background: rgba(26,26,46,0.3);
+    z-index: 499;
+    display: none;
+    backdrop-filter: blur(2px);
+  }
+  .drawer-overlay.open { display: block; }
+
+  /* ===== RGPD BANNER ===== */
+  .rgpd-banner {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--ink);
+    border-top: 2px solid rgba(201,168,76,0.3);
+    padding: 10px 30px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.55);
+    z-index: 300;
+    box-shadow: 0 -4px 20px rgba(26,26,46,0.2);
+  }
+  .rgpd-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(45,106,79,0.25);
+    border: 1px solid rgba(45,106,79,0.4);
+    color: #52b788;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .rgpd-banner a {
+    color: var(--gold-light);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  /* ===== RGPD MODAL ===== */
+  .rgpd-modal-content {
+    max-width: 580px;
+  }
+  .rgpd-section {
+    margin-bottom: 18px;
+  }
+  .rgpd-section h4 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .rgpd-section p {
+    font-size: 0.82rem;
+    color: var(--slate);
+    line-height: 1.6;
+  }
+  .rgpd-ok-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(45,106,79,0.07);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    border-left: 3px solid var(--forest);
+    font-size: 0.82rem;
+    color: var(--slate);
+  }
+  .rgpd-warn-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(201,168,76,0.08);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    border-left: 3px solid var(--gold);
+    font-size: 0.82rem;
+    color: var(--slate);
+  }
+
+  .session-toast {
+    position: fixed;
+    bottom: 28px; right: 28px;
+    background: var(--ink);
+    color: var(--gold-light);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: var(--radius);
+    padding: 12px 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    z-index: 2000;
+    box-shadow: 0 8px 24px rgba(26,26,46,0.25);
+    animation: toastIn 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  @keyframes toastIn { from { opacity:0; transform: translateY(12px); } to { opacity:1; transform:none; } }
+
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">Conseils<span>.</span>Classe</div>
+    <div class="subtitle">Planificateur automatique</div>
+  </div>
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showPanel('dates')">📅 Dates & Créneaux</button>
+    <button class="tab-btn" onclick="showPanel('classes')">🏫 Classes & Profs</button>
+    <button class="tab-btn" onclick="showPanel('contraintes')">⚠️ Contraintes</button>
+    <button class="tab-btn" onclick="showPanel('schedule')">📊 Planning</button>
+  </div>
+  <button class="session-btn" onclick="openDrawer()">🗂️ Sessions <span id="sessionCount" style="background:rgba(201,168,76,0.25);border-radius:10px;padding:1px 7px;font-size:0.72rem;"></span></button>
+</header>
+
+<!-- SESSION DRAWER OVERLAY -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+
+<!-- SESSION DRAWER -->
+<div class="session-drawer" id="sessionDrawer">
+  <div class="drawer-header">
+    <h3>🗂️ Sessions sauvegardées</h3>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-save">
+    <input type="text" id="sessionNameInput" placeholder="Nom de la session (ex: Trimestre 1 2025)…" onkeydown="if(event.key==='Enter') saveSession()">
+    <button class="btn btn-gold btn-sm" onclick="saveSession()" style="white-space:nowrap;">💾 Sauvegarder</button>
+  </div>
+  <div class="drawer-body" id="sessionList">
+    <div class="empty-state" style="padding:40px 20px;">
+      <div class="big-icon">🗂️</div>
+      <p>Aucune session sauvegardée.<br>Générez un planning et sauvegardez-le ici.</p>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- RGPD BANNER (fixed at bottom) -->
+<div class="rgpd-banner" id="rgpdBanner">
+  <span class="rgpd-badge">🛡️ RGPD Conforme</span>
+  <span>Aucune donnée personnelle n'est transmise à des serveurs externes. Toutes les données restent sur votre appareil.</span>
+  <a onclick="openRGPDModal()">En savoir plus</a>
+  <button onclick="document.getElementById('rgpdBanner').style.display='none'"
+    style="margin-left:auto; background:none; border:none; color:rgba(255,255,255,0.4); cursor:pointer; font-size:1rem;">✕</button>
+</div>
+
+<!-- RGPD MODAL -->
+<div id="rgpdModal" class="modal-overlay" style="display:none;">
+  <div class="modal rgpd-modal-content">
+    <div class="modal-title">
+      <span>🛡️ Politique de confidentialité & RGPD</span>
+      <button class="modal-close" onclick="document.getElementById('rgpdModal').style.display='none'">✕</button>
+    </div>
+
+    <div class="rgpd-section">
+      <h4>📋 Données traitées</h4>
+      <p>Cet outil traite des <strong>données professionnelles</strong> : noms de classes, noms de professeurs, horaires et plannings. Ces données peuvent constituer des données à caractère personnel au sens du RGPD (Règlement UE 2016/679).</p>
+    </div>
+
+    <div class="rgpd-section">
+      <h4>✅ Ce que cet outil garantit</h4>
+      <div class="rgpd-ok-row">✓ <span><strong>Aucun serveur externe</strong> — toutes les données restent dans votre navigateur, sur votre appareil uniquement.</span></div>
+      <div class="rgpd-ok-row">✓ <span><strong>Aucun cookie de tracking</strong> — pas de publicité, pas d'analytics, pas de profiling.</span></div>
+      <div class="rgpd-ok-row">✓ <span><strong>Stockage local uniquement</strong> — les sessions sauvegardées utilisent le localStorage de votre navigateur. Elles ne sont accessibles qu'à vous.</span></div>
+      <div class="rgpd-ok-row">✓ <span><strong>Aucune transmission à des tiers</strong> — les données ne sont ni vendues, ni partagées, ni exploitées commercialement.</span></div>
+      <div class="rgpd-ok-row">✓ <span><strong>Fonctionnement hors ligne</strong> — le site peut fonctionner sans connexion internet une fois chargé.</span></div>
+    </div>
+
+    <div class="rgpd-section">
+      <h4>⚠️ Points d'attention</h4>
+      <div class="rgpd-warn-row">⚠️ <span><strong>Bibliothèques JavaScript</strong> — pour fonctionner, ce site charge des bibliothèques depuis des serveurs CDN externes (Cloudflare). Votre adresse IP peut être transmise lors du chargement. Pour un usage 100% autonome, téléchargez les fichiers JS en local.</span></div>
+      <div class="rgpd-warn-row">⚠️ <span><strong>Responsabilité du responsable de traitement</strong> — l'établissement qui utilise cet outil est responsable du traitement des données saisies. Il lui appartient d'informer les personnes concernées (professeurs) conformément à l'article 13 du RGPD.</span></div>
+    </div>
+
+    <div class="rgpd-section">
+      <h4>🏫 Base légale</h4>
+      <p>L'utilisation de cet outil dans le cadre de la gestion des conseils de classe relève de <strong>l'exécution d'une mission d'intérêt public</strong> (article 6.1.e du RGPD), dans le cadre des missions de l'Éducation Nationale.</p>
+    </div>
+
+    <div class="rgpd-section">
+      <h4>🗑️ Suppression des données</h4>
+      <p>Pour effacer toutes les données stockées sur votre appareil : videz le localStorage de votre navigateur pour ce site, ou utilisez la navigation privée. Les sessions peuvent être supprimées individuellement depuis le panneau <strong>🗂️ Sessions</strong>.</p>
+    </div>
+
+    <div style="margin-top:20px; text-align:right;">
+      <button class="btn btn-primary btn-sm" onclick="document.getElementById('rgpdModal').style.display='none'">✓ Compris</button>
+    </div>
+  </div>
+</div>
+
+  <!-- =================== PANEL DATES =================== -->
+  <div id="panel-dates" class="panel active">
+    <h2 class="section-title"><span class="icon icon-gold">📅</span> Période des conseils de classe</h2>
+
+    <div class="card">
+      <div class="card-title"><span class="icon icon-gold">🗓️</span> Définir la période</div>
+      <div class="row">
+        <div>
+          <label>Date de début</label>
+          <input type="date" id="inputPeriodStart">
+        </div>
+        <div>
+          <label>Date de fin</label>
+          <input type="date" id="inputPeriodEnd">
+        </div>
+      </div>
+
+      <label style="margin-top:18px;">Jours de la semaine disponibles</label>
+      <div class="checkbox-group" id="dayCheckboxes">
+        <label class="checkbox-label"><input type="checkbox" value="1"> Lundi</label>
+        <label class="checkbox-label"><input type="checkbox" value="2"> Mardi</label>
+        <label class="checkbox-label"><input type="checkbox" value="3"> Mercredi</label>
+        <label class="checkbox-label"><input type="checkbox" value="4"> Jeudi</label>
+        <label class="checkbox-label"><input type="checkbox" value="5"> Vendredi</label>
+        <label class="checkbox-label"><input type="checkbox" value="6"> Samedi</label>
+      </div>
+
+      <div class="row" style="margin-top:16px;">
+        <div>
+          <label>Heure de début des conseils</label>
+          <input type="time" id="inputTimeStart" value="08:00">
+        </div>
+        <div>
+          <label>Heure de fin</label>
+          <input type="time" id="inputTimeEnd" value="18:00">
+        </div>
+        <div>
+          <label>Durée d'un conseil (min)</label>
+          <input type="text" id="inputDuration" value="60" placeholder="60">
+        </div>
+      </div>
+
+      <div style="margin-top:20px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="generateDatesFromPeriod()">⚡ Générer les dates</button>
+        <button class="btn btn-danger btn-sm" onclick="clearAllDates()" style="margin-left:auto;">🗑️ Tout effacer</button>
+      </div>
+      <div id="periodPreview" style="margin-top:14px;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon icon-gold">📋</span> Dates générées <span id="dateCountBadge" class="duration-badge" style="margin-left:6px;"></span></div>
+      <div id="datesList">
+        <div class="empty-state"><div class="big-icon">📅</div><p>Définissez une période et cliquez sur <strong>Générer les dates</strong>.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== PANEL CLASSES =================== -->
+  <div id="panel-classes" class="panel">
+    <h2 class="section-title"><span class="icon icon-forest">🏫</span> Classes et professeurs</h2>
+
+    <!-- IMPORT EXCEL -->
+    <div class="card">
+      <div class="card-title"><span class="icon icon-gold">📥</span> Importer depuis un fichier Excel</div>
+
+      <div class="format-hint">
+        <strong>Format attendu du fichier Excel :</strong><br>
+        Ligne <code>1</code> = en-têtes : colonne A vide (ou "Matière"), puis <strong>un nom de classe par colonne</strong> (B, C, D…)<br>
+        Lignes suivantes : colonne A = matière, colonnes B, C, D… = nom du professeur pour chaque classe.<br><br>
+        <table>
+          <tr><th>Matière (col. A)</th><th>6ème A (col. B)</th><th>6ème B (col. C)</th><th>5ème A (col. D)</th></tr>
+          <tr><td>Français</td><td>Mme Martin</td><td>M. Dupont</td><td>Mme Leroy</td></tr>
+          <tr><td>Maths</td><td>M. Dupont</td><td>Mme Chen</td><td>M. Dupont</td></tr>
+          <tr><td>Histoire</td><td>Mme Leroy</td><td>Mme Leroy</td><td>M. Bernard</td></tr>
+        </table>
+        Une cellule vide signifie qu'aucun professeur n'est assigné pour cette matière dans cette classe.
+      </div>
+
+      <div class="drop-excel" id="dropExcel"
+        ondragover="excelDragOver(event)"
+        ondragleave="excelDragLeave(event)"
+        ondrop="excelDrop(event)">
+        <input type="file" accept=".xlsx,.xls,.csv" onchange="handleExcelFile(event)">
+        <div class="drop-icon">📊</div>
+        <div class="drop-text">Glissez votre fichier Excel ici</div>
+        <div class="drop-sub">ou cliquez pour sélectionner (.xlsx, .xls, .csv)</div>
+      </div>
+
+      <div id="excelPreview" style="margin-top:16px;"></div>
+    </div>
+
+    <!-- AJOUT MANUEL -->
+    <div class="card">
+      <div class="card-title"><span class="icon icon-forest">✏️</span> Ajouter une classe manuellement</div>
+      <div class="row">
+        <div>
+          <label>Nom de la classe</label>
+          <input type="text" id="inputClassName" placeholder="Ex: 3ème A, Terminale S2...">
+        </div>
+        <div>
+          <label>Durée spécifique (min, optionnel)</label>
+          <input type="text" id="inputClassDuration" placeholder="Laisser vide = durée par défaut">
+        </div>
+      </div>
+      <label style="margin-top:14px;">Professeurs (tapez un nom et appuyez Entrée)</label>
+      <input type="text" id="inputProfName" placeholder="Nom du professeur..." onkeydown="handleProfKey(event)">
+      <div id="profTagsContainer" style="min-height:36px; margin-top:8px; display:flex; flex-wrap:wrap; gap:4px;"></div>
+      <button class="btn btn-forest" style="margin-top:16px;" onclick="addClass()">➕ Ajouter la classe</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon icon-forest">📋</span> Classes enregistrées</div>
+      <div id="classesList">
+        <div class="empty-state"><div class="big-icon">🏫</div><p>Aucune classe ajoutée.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== PANEL CONTRAINTES =================== -->
+  <div id="panel-contraintes" class="panel">
+    <h2 class="section-title"><span class="icon icon-rust">⚠️</span> Contraintes horaires</h2>
+
+    <div class="alert alert-info">
+      ℹ️ Définissez ici les indisponibilités des professeurs. Ces contraintes seront respectées lors de la génération du planning.
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon icon-rust">➕</span> Ajouter une contrainte</div>
+      <div class="row">
+        <div>
+          <label>Professeur</label>
+          <select id="constraintProf">
+            <option value="">-- Sélectionner --</option>
+          </select>
+        </div>
+        <div>
+          <label>Type de contrainte</label>
+          <select id="constraintType" onchange="updateConstraintUI()">
+            <option value="day">Journée entière indisponible</option>
+            <option value="range">Plage horaire indisponible</option>
+          </select>
+        </div>
+      </div>
+      <div id="constraintDateFields">
+        <label>Date concernée</label>
+        <select id="constraintDate">
+          <option value="">-- Sélectionner une date --</option>
+        </select>
+      </div>
+      <div id="constraintTimeFields" style="display:none;">
+        <div class="row">
+          <div>
+            <label>De</label>
+            <input type="time" id="constraintFrom" value="08:00">
+          </div>
+          <div>
+            <label>À</label>
+            <input type="time" id="constraintTo" value="12:00">
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-danger" style="margin-top:16px; background:var(--rust); color:white;" onclick="addConstraint()">➕ Ajouter la contrainte</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title"><span class="icon icon-rust">📋</span> Contraintes enregistrées</div>
+      <div id="constraintsList">
+        <div class="empty-state"><div class="big-icon">⚠️</div><p>Aucune contrainte définie.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- =================== PANEL SCHEDULE =================== -->
+  <div id="panel-schedule" class="panel">
+    <h2 class="section-title"><span class="icon icon-slate">📊</span> Planning des conseils de classe</h2>
+
+    <div class="card">
+      <div class="card-title"><span class="icon icon-forest">📚</span> Matières à prendre en compte</div>
+      <p style="font-size:0.83rem; color:var(--slate); margin-bottom:14px;">Cochez les matières dont les professeurs doivent être considérés pour la détection des conflits. Un professeur présent dans plusieurs classes ne pourra pas avoir deux conseils en même temps.</p>
+      <div id="matieresSelector">
+        <div class="alert alert-info">ℹ️ Importez d'abord vos classes depuis l'onglet <strong>Classes & Profs</strong> pour voir les matières disponibles.</div>
+      </div>
+      <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;" id="matieresActions" style="display:none;">
+        <button class="btn btn-sm" style="background:var(--cream); border:1px solid var(--mist);" onclick="toggleAllMatieres(true)">✓ Tout cocher</button>
+        <button class="btn btn-sm" style="background:var(--cream); border:1px solid var(--mist);" onclick="toggleAllMatieres(false)">✗ Tout décocher</button>
+      </div>
+    </div>
+
+    <div class="schedule-header">
+      <div id="scheduleStats" class="stats-bar"></div>
+      <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+        <div style="display:flex; align-items:center; gap:10px; background:var(--cream); border:1.5px solid var(--mist); border-radius:var(--radius); padding:8px 14px;">
+          <label style="margin:0; font-size:0.78rem; font-weight:600; text-transform:uppercase; letter-spacing:0.8px; color:var(--slate); white-space:nowrap;">Conseils / créneau</label>
+          <div style="display:flex; gap:5px;">
+            <button id="slotBtn1" onclick="setMaxPerSlot(1)"
+              style="width:36px; height:32px; border-radius:6px; border:1.5px solid var(--forest); background:var(--forest); color:white; font-weight:700; font-size:0.9rem; cursor:pointer; transition:all 0.15s;">1</button>
+            <button id="slotBtn2" onclick="setMaxPerSlot(2)"
+              style="width:36px; height:32px; border-radius:6px; border:1.5px solid var(--mist); background:var(--white); color:var(--slate); font-weight:700; font-size:0.9rem; cursor:pointer; transition:all 0.15s;">2</button>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; background:var(--cream); border:1.5px solid var(--mist); border-radius:var(--radius); padding:8px 14px;">
+          <label style="margin:0; font-size:0.78rem; font-weight:600; text-transform:uppercase; letter-spacing:0.8px; color:var(--slate); white-space:nowrap;">Max conseils / soir</label>
+          <input type="number" id="inputMaxPerDay" value="" min="1" placeholder="∞"
+            style="width:60px; padding:4px 8px; font-size:0.9rem; font-weight:700; text-align:center; background:var(--white); border:1.5px solid var(--mist); border-radius:6px; color:var(--ink);"
+            title="Laisser vide = pas de limite">
+        </div>
+        <button class="btn btn-gold" onclick="generateSchedule()">⚡ Générer le planning</button>
+      </div>
+    </div>
+
+    <div id="scheduleAlerts"></div>
+    <div id="scheduleLegend" style="display:none;" class="legend">
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(45,106,79,0.4);border:1.5px solid rgba(45,106,79,0.5);"></div> Conseil planifié</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(192,80,58,0.3);border:1.5px solid rgba(192,80,58,0.4);"></div> Conflit détecté</div>
+      <div class="legend-item" id="legendSlot2" style="display:none;"><div class="legend-dot" style="background:rgba(45,106,79,0.15);border:1.5px dashed rgba(45,106,79,0.4);"></div> 2 conseils en parallèle</div>
+      <div class="legend-item" style="font-style:italic; font-size:0.75rem; color:var(--slate);">💡 Cliquez sur un conseil pour le déplacer</div>
+    </div>
+
+    <div id="scheduleContent" style="margin-top:20px;">
+      <div class="empty-state card"><div class="big-icon">📊</div><p>Configurez les dates et les classes, puis cliquez sur <strong>Générer le planning</strong>.</p></div>
+    </div>
+
+    <!-- EXPORT BAR -->
+    <div class="export-bar" id="exportBar" style="display:none;">
+      <span class="export-label">⬇️ Télécharger le planning</span>
+      <button class="btn-export btn-export-pdf" onclick="exportPDF()">
+        <span>📄</span> PDF
+        <span class="export-spinner" id="spinPDF"></span>
+      </button>
+      <button class="btn-export btn-export-xlsx" onclick="exportExcel()">
+        <span>📊</span> Excel (.xlsx)
+        <span class="export-spinner" id="spinXLSX"></span>
+      </button>
+      <button class="btn-export btn-export-word" onclick="exportWord()">
+        <span>📝</span> Word (.html)
+        <span class="export-spinner" id="spinWord"></span>
+      </button>
+      <span style="font-size:0.72rem; color:rgba(255,255,255,0.4); margin-left:auto;">Planning généré le <span id="exportDate"></span></span>
+    </div>
+  </div>
+
+</div>
+
+<!-- =================== MODAL DÉPLACER =================== -->
+<div id="moveModal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <div class="modal-title">
+      <span>🔄 Déplacer un conseil</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="moveModalContent"></div>
+    <div style="display:flex; gap:10px; margin-top:20px; justify-content:flex-end;">
+      <button class="btn btn-primary btn-sm" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-forest btn-sm" id="btnConfirmMove" onclick="confirmMove()">✓ Confirmer le déplacement</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== DATA STORE =====================
+let data = {
+  dates: [],       // { id, date, timeStart, timeEnd, duration }
+  classes: [],     // { id, name, profs, duration }
+  constraints: [], // { id, prof, type, date, from, to }
+  schedule: []     // { id, classId, className, profs, dateId, slotIndex, slotStart, slotEnd }
+};
+
+let tempProfs = [];
+let draggedItem = null;
+let maxPerSlot = 1; // 1 or 2 conseils per time slot
+let moveTarget = null; // { scheduleId }
+
+// ===================== UTILS =====================
+function uid() { return Math.random().toString(36).substr(2,9); }
+
+function formatDate(d) {
+  const dt = new Date(d + 'T12:00:00');
+  return dt.toLocaleDateString('fr-FR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+}
+
+function minutesToHHMM(mins) {
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+}
+
+function timeToMinutes(t) {
+  const [h,m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function getAllProfs() {
+  const set = new Set();
+  data.classes.forEach(c => c.profs.forEach(p => set.add(p)));
+  return [...set].sort();
+}
+
+// ===================== TABS =====================
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-' + name).classList.add('active');
+  event.target.classList.add('active');
+  if (name === 'contraintes') updateConstraintOptions();
+  if (name === 'schedule') { renderScheduleStats(); renderMatieresSelector(); }
+}
+
+// ===================== DATES =====================
+const DAY_NAMES = ['', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
+
+function generateDatesFromPeriod() {
+  const start = document.getElementById('inputPeriodStart').value;
+  const end = document.getElementById('inputPeriodEnd').value;
+  const ts = document.getElementById('inputTimeStart').value;
+  const te = document.getElementById('inputTimeEnd').value;
+  const dur = parseInt(document.getElementById('inputDuration').value) || 60;
+
+  const checkedDays = [...document.querySelectorAll('#dayCheckboxes input:checked')].map(i => parseInt(i.value));
+
+  if (!start || !end) { showPeriodError('Veuillez sélectionner une date de début et de fin.'); return; }
+  if (start > end) { showPeriodError('La date de fin doit être après la date de début.'); return; }
+  if (!checkedDays.length) { showPeriodError('Cochez au moins un jour de la semaine.'); return; }
+  if (timeToMinutes(te) <= timeToMinutes(ts)) { showPeriodError('L\'heure de fin doit être après l\'heure de début.'); return; }
+
+  // Generate all dates in range matching selected weekdays
+  const newDates = [];
+  const cur = new Date(start + 'T12:00:00');
+  const endDate = new Date(end + 'T12:00:00');
+
+  while (cur <= endDate) {
+    const dow = cur.getDay(); // 0=Sun, 1=Mon...6=Sat
+    const isoDay = dow === 0 ? 7 : dow; // convert to 1=Mon...7=Sun
+    if (checkedDays.includes(isoDay)) {
+      const dateStr = cur.toISOString().split('T')[0];
+      // Don't duplicate
+      if (!data.dates.find(d => d.date === dateStr)) {
+        newDates.push({ id: uid(), date: dateStr, timeStart: ts, timeEnd: te, duration: dur });
+      }
+    }
+    cur.setDate(cur.getDate() + 1);
+  }
+
+  if (!newDates.length) {
+    showPeriodError('Aucune date trouvée pour cette période avec ces jours. Des dates identiques existent peut-être déjà.');
+    return;
+  }
+
+  data.dates = [...data.dates, ...newDates];
+  data.dates.sort((a, b) => a.date.localeCompare(b.date));
+
+  document.getElementById('periodPreview').innerHTML =
+    `<div class="alert alert-success">✓ <strong>${newDates.length} date(s)</strong> ajoutée(s) sur la période du ${formatDate(start)} au ${formatDate(end)}.</div>`;
+
+  renderDates();
+  updateConstraintOptions();
+}
+
+function showPeriodError(msg) {
+  document.getElementById('periodPreview').innerHTML = `<div class="alert alert-error">❌ ${msg}</div>`;
+}
+
+function clearAllDates() {
+  if (!data.dates.length) return;
+  if (!confirm('Supprimer toutes les dates ? Le planning sera également réinitialisé.')) return;
+  data.dates = [];
+  data.schedule = [];
+  document.getElementById('periodPreview').innerHTML = '';
+  renderDates();
+  updateConstraintOptions();
+}
+
+function removeDate(id) {
+  data.dates = data.dates.filter(d => d.id !== id);
+  data.schedule = data.schedule.filter(s => s.dateId !== id);
+  renderDates();
+  updateConstraintOptions();
+}
+
+function renderDates() {
+  const el = document.getElementById('datesList');
+  const badge = document.getElementById('dateCountBadge');
+  if (badge) badge.textContent = data.dates.length ? data.dates.length + ' jour(s)' : '';
+
+  if (!data.dates.length) {
+    el.innerHTML = '<div class="empty-state"><div class="big-icon">📅</div><p>Aucune date générée.</p></div>';
+    return;
+  }
+
+  // Group by month for readability
+  const byMonth = {};
+  data.dates.forEach(d => {
+    const month = d.date.slice(0, 7); // "2024-11"
+    if (!byMonth[month]) byMonth[month] = [];
+    byMonth[month].push(d);
+  });
+
+  let html = '';
+  Object.entries(byMonth).forEach(([month, dates]) => {
+    const label = new Date(month + '-15').toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    html += `<div style="margin-bottom:16px;">
+      <div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--slate); margin-bottom:8px; padding-bottom:4px; border-bottom:1px solid var(--mist);">${label}</div>
+      <div style="display:flex; flex-wrap:wrap; gap:8px;">`;
+    dates.forEach(d => {
+      const totalMin = timeToMinutes(d.timeEnd) - timeToMinutes(d.timeStart);
+      const slots = Math.floor(totalMin / d.duration);
+      const dayName = new Date(d.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short' });
+      const dayNum = new Date(d.date + 'T12:00:00').getDate();
+      html += `<div style="background:var(--cream); border:1px solid var(--mist); border-left:3px solid var(--gold); border-radius:var(--radius); padding:8px 12px; display:flex; flex-direction:column; gap:3px; min-width:130px;">
+        <div style="font-weight:700; font-size:0.88rem;">${dayName} ${dayNum}</div>
+        <div style="font-size:0.72rem; color:var(--slate);">${d.timeStart}–${d.timeEnd}</div>
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+          <span class="duration-badge" style="background:rgba(45,106,79,0.1);color:var(--forest);">${slots} créneaux</span>
+          <span class="remove" onclick="removeDate('${d.id}')" style="cursor:pointer; color:var(--slate); font-size:0.9rem;" title="Supprimer">✕</span>
+        </div>
+      </div>`;
+    });
+    html += `</div></div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+
+// ===================== CLASSES =====================
+function handleProfKey(e) {
+  if (e.key === 'Enter') {
+    const val = e.target.value.trim();
+    if (val && !tempProfs.includes(val)) {
+      tempProfs.push(val);
+      renderTempProfs();
+    }
+    e.target.value = '';
+    e.preventDefault();
+  }
+}
+
+function renderTempProfs() {
+  const c = document.getElementById('profTagsContainer');
+  c.innerHTML = tempProfs.map((p,i) => `<span class="tag">${p} <span class="remove" onclick="removeTempProf(${i})">×</span></span>`).join('');
+}
+
+function removeTempProf(i) {
+  tempProfs.splice(i, 1);
+  renderTempProfs();
+}
+
+function addClass() {
+  const name = document.getElementById('inputClassName').value.trim();
+  const dur = parseInt(document.getElementById('inputClassDuration').value) || null;
+  if (!name) { alert('Veuillez entrer un nom de classe.'); return; }
+  if (!tempProfs.length) { alert('Ajoutez au moins un professeur.'); return; }
+  if (data.classes.find(c => c.name.toLowerCase() === name.toLowerCase())) {
+    alert('Une classe avec ce nom existe déjà.'); return;
+  }
+
+  data.classes.push({ id: uid(), name, profs: [...tempProfs], duration: dur });
+  tempProfs = [];
+  document.getElementById('inputClassName').value = '';
+  document.getElementById('inputClassDuration').value = '';
+  document.getElementById('profTagsContainer').innerHTML = '';
+  renderClasses();
+  updateConstraintOptions();
+}
+
+function removeClass(id) {
+  data.classes = data.classes.filter(c => c.id !== id);
+  data.schedule = data.schedule.filter(s => s.classId !== id);
+  renderClasses();
+  updateConstraintOptions();
+}
+
+function renderClasses() {
+  const el = document.getElementById('classesList');
+  if (!data.classes.length) {
+    el.innerHTML = '<div class="empty-state"><div class="big-icon">🏫</div><p>Aucune classe ajoutée.</p></div>';
+    return;
+  }
+  el.innerHTML = data.classes.map(c => `
+    <div class="class-item">
+      <div class="class-info">
+        <div class="class-name">🏫 ${c.name}${c.duration ? `<span class="duration-badge">${c.duration} min</span>` : ''}</div>
+        <div class="profs-list">${c.profs.map(p => `<span class="prof-tag">👤 ${p}</span>`).join('')}</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="removeClass('${c.id}')">✕</button>
+    </div>`).join('');
+}
+
+// ===================== CONSTRAINTS =====================
+function updateConstraintOptions() {
+  const profSel = document.getElementById('constraintProf');
+  const dateSel = document.getElementById('constraintDate');
+  const allProfs = getAllProfs();
+
+  profSel.innerHTML = '<option value="">-- Sélectionner --</option>' +
+    allProfs.map(p => `<option value="${p}">${p}</option>`).join('');
+
+  dateSel.innerHTML = '<option value="">-- Sélectionner une date --</option>' +
+    data.dates.map(d => `<option value="${d.id}">${formatDate(d.date)} (${d.timeStart}–${d.timeEnd})</option>`).join('');
+}
+
+function updateConstraintUI() {
+  const type = document.getElementById('constraintType').value;
+  document.getElementById('constraintTimeFields').style.display = type === 'range' ? 'block' : 'none';
+}
+
+function addConstraint() {
+  const prof = document.getElementById('constraintProf').value;
+  const type = document.getElementById('constraintType').value;
+  const dateId = document.getElementById('constraintDate').value;
+
+  if (!prof || !dateId) { alert('Veuillez sélectionner un professeur et une date.'); return; }
+
+  let from = null, to = null;
+  if (type === 'range') {
+    from = document.getElementById('constraintFrom').value;
+    to = document.getElementById('constraintTo').value;
+    if (!from || !to) { alert('Veuillez entrer les horaires d\'indisponibilité.'); return; }
+    if (timeToMinutes(to) <= timeToMinutes(from)) { alert('L\'heure de fin doit être après l\'heure de début.'); return; }
+  }
+
+  const dateObj = data.dates.find(d => d.id === dateId);
+  data.constraints.push({ id: uid(), prof, type, dateId, date: dateObj.date, from, to });
+  renderConstraints();
+}
+
+function removeConstraint(id) {
+  data.constraints = data.constraints.filter(c => c.id !== id);
+  renderConstraints();
+}
+
+function renderConstraints() {
+  const el = document.getElementById('constraintsList');
+  if (!data.constraints.length) {
+    el.innerHTML = '<div class="empty-state"><div class="big-icon">⚠️</div><p>Aucune contrainte définie.</p></div>';
+    return;
+  }
+  el.innerHTML = data.constraints.map(c => {
+    const desc = c.type === 'day'
+      ? `Toute la journée`
+      : `De ${c.from} à ${c.to}`;
+    return `<div class="constraint-item">
+      <div class="constraint-info">
+        <strong>👤 ${c.prof}</strong> —
+        <span>indisponible le ${formatDate(c.date)} : ${desc}</span>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="removeConstraint('${c.id}')">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ===================== MATIERES SELECTOR =====================
+function getAllMatieres() {
+  const set = new Set();
+  data.classes.forEach(c => {
+    if (c.profEntries) c.profEntries.forEach(e => { if (e.matiere) set.add(e.matiere); });
+  });
+  return [...set].sort();
+}
+
+function renderMatieresSelector() {
+  const el = document.getElementById('matieresSelector');
+  const actionsEl = document.getElementById('matieresActions');
+  const matieres = getAllMatieres();
+
+  if (!matieres.length) {
+    el.innerHTML = '<div class="alert alert-info">ℹ️ Importez d\'abord vos classes depuis l\'onglet <strong>Classes & Profs</strong> pour voir les matières disponibles.</div>';
+    if (actionsEl) actionsEl.style.display = 'none';
+    return;
+  }
+
+  if (actionsEl) actionsEl.style.display = 'flex';
+
+  // Keep existing checked state
+  const existing = getSelectedMatieres();
+
+  el.innerHTML = '<div class="checkbox-group" id="matieresCheckboxes">' +
+    matieres.map(m => {
+      const checked = existing.length === 0 || existing.includes(m) ? 'checked' : '';
+      return `<label class="checkbox-label" style="border-color:${checked ? 'var(--forest)' : 'var(--mist)'}; background:${checked ? 'rgba(45,106,79,0.06)' : 'var(--paper)'}">
+        <input type="checkbox" value="${m}" ${checked} onchange="onMatiereToggle(this)"> 📚 ${m}
+      </label>`;
+    }).join('') +
+  '</div>';
+}
+
+function onMatiereToggle(input) {
+  const label = input.closest('label');
+  if (input.checked) {
+    label.style.borderColor = 'var(--forest)';
+    label.style.background = 'rgba(45,106,79,0.06)';
+  } else {
+    label.style.borderColor = 'var(--mist)';
+    label.style.background = 'var(--paper)';
+  }
+}
+
+function toggleAllMatieres(checked) {
+  document.querySelectorAll('#matieresCheckboxes input').forEach(cb => {
+    cb.checked = checked;
+    onMatiereToggle(cb);
+  });
+}
+
+function getSelectedMatieres() {
+  return [...document.querySelectorAll('#matieresCheckboxes input:checked')].map(i => i.value);
+}
+
+// Returns the filtered profs for a class based on selected matières
+function getActiveProfsForClass(cls) {
+  const selectedMatieres = getSelectedMatieres();
+  if (!cls.profEntries || !selectedMatieres.length) return cls.profs;
+
+  const filtered = cls.profEntries
+    .filter(e => selectedMatieres.includes(e.matiere))
+    .map(e => e.prof);
+
+  // Deduplicate
+  return [...new Set(filtered)];
+}
+
+// ===================== SCHEDULE GENERATION =====================
+function getSlots(dateObj) {
+  const slots = [];
+  const start = timeToMinutes(dateObj.timeStart);
+  const end = timeToMinutes(dateObj.timeEnd);
+  const dur = dateObj.duration;
+  let cur = start;
+  while (cur + dur <= end) {
+    slots.push({ start: cur, end: cur + dur, label: minutesToHHMM(cur) + ' – ' + minutesToHHMM(cur + dur) });
+    cur += dur;
+  }
+  return slots;
+}
+
+function isProfBlocked(prof, dateId, slotStart, slotEnd) {
+  return data.constraints.some(c => {
+    if (c.prof !== prof || c.dateId !== dateId) return false;
+    if (c.type === 'day') return true;
+    // range overlap
+    const cFrom = timeToMinutes(c.from);
+    const cTo = timeToMinutes(c.to);
+    return slotStart < cTo && slotEnd > cFrom;
+  });
+}
+
+function isProfBusy(prof, dateId, slotIndex, excludeScheduleId = null) {
+  return data.schedule.some(s => {
+    if (s.id === excludeScheduleId) return false;
+    if (s.dateId !== dateId || s.slotIndex !== slotIndex) return false;
+    return s.profs.includes(prof);
+  });
+}
+
+function getClassDuration(classObj, dateObj) {
+  return classObj.duration || dateObj.duration;
+}
+
+function setMaxPerSlot(n) {
+  maxPerSlot = n;
+  document.getElementById('slotBtn1').style.background = n === 1 ? 'var(--forest)' : 'var(--white)';
+  document.getElementById('slotBtn1').style.color = n === 1 ? 'white' : 'var(--slate)';
+  document.getElementById('slotBtn1').style.borderColor = n === 1 ? 'var(--forest)' : 'var(--mist)';
+  document.getElementById('slotBtn2').style.background = n === 2 ? 'var(--forest)' : 'var(--white)';
+  document.getElementById('slotBtn2').style.color = n === 2 ? 'white' : 'var(--slate)';
+  document.getElementById('slotBtn2').style.borderColor = n === 2 ? 'var(--forest)' : 'var(--mist)';
+}
+
+function generateSchedule() {
+  if (!data.dates.length) { alert('Ajoutez d\'abord une période de dates.'); return; }
+  if (!data.classes.length) { alert('Ajoutez d\'abord des classes.'); return; }
+
+  const selectedMatieres = getSelectedMatieres();
+  if (getAllMatieres().length > 0 && selectedMatieres.length === 0) {
+    alert('Cochez au moins une matière à prendre en compte.'); return;
+  }
+
+  const maxPerDayVal = document.getElementById('inputMaxPerDay').value;
+  const maxPerDay = maxPerDayVal !== '' ? parseInt(maxPerDayVal) : Infinity;
+
+  data.schedule = [];
+
+  // Track how many conseils per date AND per slot
+  const countPerDate = {};
+  const countPerSlot = {}; // key: "dateId_slotIdx"
+  data.dates.forEach(d => { countPerDate[d.id] = 0; });
+
+  const slotKey = (dateId, slotIdx) => `${dateId}_${slotIdx}`;
+  const getSlotCount = (dateId, slotIdx) => countPerSlot[slotKey(dateId, slotIdx)] || 0;
+
+  // Build all available slots per date
+  const allSlots = {};
+  data.dates.forEach(d => { allSlots[d.id] = getSlots(d); });
+
+  function scoreSlot(classObj, dateId, slotIdx) {
+    const slot = allSlots[dateId][slotIdx];
+    const activeProfs = getActiveProfsForClass(classObj);
+    let score = 0;
+
+    // Hard penalty if slot is already full (maxPerSlot reached)
+    if (getSlotCount(dateId, slotIdx) >= maxPerSlot) score += 50000;
+
+    // Hard penalty if date is full
+    if (countPerDate[dateId] >= maxPerDay) score += 10000;
+
+    activeProfs.forEach(p => {
+      if (isProfBlocked(p, dateId, slot.start, slot.end)) score += 100;
+      if (isProfBusy(p, dateId, slotIdx)) score += 10;
+    });
+
+    // Slight preference for spreading across dates
+    score += countPerDate[dateId] * 0.1;
+
+    return score;
+  }
+
+  // Sort classes by number of active profs descending (harder to place first)
+  const sortedClasses = [...data.classes].sort((a, b) =>
+    getActiveProfsForClass(b).length - getActiveProfsForClass(a).length
+  );
+
+  for (const cls of sortedClasses) {
+    const activeProfs = getActiveProfsForClass(cls);
+    let best = null;
+    let bestScore = Infinity;
+
+    for (const dateObj of data.dates) {
+      const slots = allSlots[dateObj.id];
+      for (let si = 0; si < slots.length; si++) {
+        const s = scoreSlot(cls, dateObj.id, si);
+        if (s < bestScore) {
+          bestScore = s;
+          best = { dateId: dateObj.id, slotIndex: si, slot: slots[si] };
+        }
+      }
+    }
+
+    if (best) {
+      data.schedule.push({
+        id: uid(),
+        classId: cls.id,
+        className: cls.name,
+        profs: activeProfs,
+        allProfs: cls.profs,
+        dateId: best.dateId,
+        slotIndex: best.slotIndex,
+        slotStart: best.slot.start,
+        slotEnd: best.slot.end,
+        slotLabel: best.slot.label
+      });
+      countPerDate[best.dateId]++;
+      const k = slotKey(best.dateId, best.slotIndex);
+      countPerSlot[k] = (countPerSlot[k] || 0) + 1;
+    }
+  }
+
+  renderSchedule();
+  renderScheduleStats();
+  document.getElementById('scheduleContent').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function detectConflicts() {
+  const conflicts = [];
+  data.schedule.forEach(s => {
+    s.profs.forEach(p => {
+      // busy conflict
+      const others = data.schedule.filter(o => o.id !== s.id && o.dateId === s.dateId && o.slotIndex === s.slotIndex && o.profs.includes(p));
+      if (others.length) conflicts.push({ scheduleId: s.id, prof: p, reason: `Conflit avec ${others.map(o=>o.className).join(', ')}` });
+      // constraint conflict
+      if (isProfBlocked(p, s.dateId, s.slotStart, s.slotEnd)) {
+        conflicts.push({ scheduleId: s.id, prof: p, reason: `Indisponibilité déclarée` });
+      }
+    });
+  });
+  return conflicts;
+}
+
+function renderScheduleStats() {
+  const el = document.getElementById('scheduleStats');
+  const conflicts = detectConflicts();
+
+  const maxPerDayVal = document.getElementById('inputMaxPerDay')?.value;
+  const maxPerDay = maxPerDayVal !== '' && maxPerDayVal ? parseInt(maxPerDayVal) : Infinity;
+
+  // Count per date
+  const countPerDate = {};
+  data.schedule.forEach(s => { countPerDate[s.dateId] = (countPerDate[s.dateId] || 0) + 1; });
+  const overloaded = Object.values(countPerDate).filter(c => c > maxPerDay).length;
+
+  el.innerHTML = `
+    <div class="stat-chip"><div class="stat-val">${data.classes.length}</div><div class="stat-lab">Classes</div></div>
+    <div class="stat-chip"><div class="stat-val">${data.schedule.length}</div><div class="stat-lab">Planifiés</div></div>
+    <div class="stat-chip"><div class="stat-val">${data.dates.length}</div><div class="stat-lab">Journées</div></div>
+    ${maxPerDay !== Infinity ? `<div class="stat-chip" style="border-color:${overloaded ? 'rgba(192,80,58,0.3)' : 'rgba(45,106,79,0.3)'}"><div class="stat-val" style="color:${overloaded ? 'var(--rust)' : 'var(--forest)'}">${overloaded}</div><div class="stat-lab">Soirs > max</div></div>` : ''}
+    <div class="stat-chip" style="border-color:${conflicts.length ? 'rgba(192,80,58,0.3)' : 'rgba(45,106,79,0.3)'}"><div class="stat-val" style="color:${conflicts.length ? 'var(--rust)' : 'var(--forest)'}">${conflicts.length}</div><div class="stat-lab">Conflits</div></div>
+  `;
+}
+
+function renderSchedule() {
+  const el = document.getElementById('scheduleContent');
+  const alerts = document.getElementById('scheduleAlerts');
+  const legend = document.getElementById('scheduleLegend');
+
+  if (!data.schedule.length) {
+    el.innerHTML = '<div class="empty-state card"><div class="big-icon">📊</div><p>Aucun conseil planifié.</p></div>';
+    alerts.innerHTML = '';
+    legend.style.display = 'none';
+    return;
+  }
+
+  legend.style.display = 'flex';
+  const leg2 = document.getElementById('legendSlot2');
+  if (leg2) leg2.style.display = maxPerSlot === 2 ? 'flex' : 'none';
+  const conflicts = detectConflicts();
+  const conflictIds = new Set(conflicts.map(c => c.scheduleId));
+
+  // Alerts
+  if (conflicts.length) {
+    const byId = {};
+    conflicts.forEach(c => { if (!byId[c.scheduleId]) byId[c.scheduleId] = []; byId[c.scheduleId].push(c); });
+    const s = data.schedule.filter(s => conflictIds.has(s.id));
+    alerts.innerHTML = `<div class="alert alert-warn">⚠️ <strong>${conflicts.length} conflit(s) détecté(s)</strong> : 
+      ${s.map(sc => {
+        const cs = byId[sc.id].map(c=>`${c.prof} (${c.reason})`).join(', ');
+        return `<strong>${sc.className}</strong> → ${cs}`;
+      }).join(' | ')}
+      <br><small>Cliquez sur un bloc pour déplacer le conseil.</small>
+    </div>`;
+  } else {
+    alerts.innerHTML = `<div class="alert alert-success">✓ Aucun conflit détecté. Planning optimal !</div>`;
+  }
+
+  // Build table: rows = time slots, cols = dates
+  const allDates = data.dates;
+  const maxSlots = Math.max(...allDates.map(d => getSlots(d).length));
+
+  let html = `<div class="card" style="padding:0; overflow:hidden;">
+  <div class="schedule-table-wrapper">
+  <table class="schedule-table">
+    <thead><tr>
+      <th>Créneau</th>
+      ${allDates.map(d => `<th>${formatDate(d.date)}</th>`).join('')}
+    </tr></thead>
+    <tbody>`;
+
+  // collect all unique slot indices
+  const slotLabelsPerDate = {};
+  allDates.forEach(d => { slotLabelsPerDate[d.id] = getSlots(d); });
+
+  for (let si = 0; si < maxSlots; si++) {
+    html += '<tr>';
+    // Slot label from first date that has it
+    const labelDate = allDates.find(d => slotLabelsPerDate[d.id][si]);
+    const slotLabel = labelDate ? slotLabelsPerDate[labelDate.id][si].label : '';
+    html += `<td class="slot-label">${slotLabel}</td>`;
+
+    allDates.forEach(d => {
+      const slots = slotLabelsPerDate[d.id];
+      if (si >= slots.length) {
+        html += '<td style="background:var(--cream);"></td>';
+        return;
+      }
+      const items = data.schedule.filter(s => s.dateId === d.id && s.slotIndex === si);
+      html += '<td><div class="drop-zone" data-date="' + d.id + '" data-slot="' + si + '">';
+
+      // If 2 items in this slot, display them side by side
+      if (items.length > 1) {
+        html += '<div style="display:flex; gap:4px;">';
+      }
+
+      items.forEach(item => {
+        const isConflict = conflictIds.has(item.id);
+        const flex = items.length > 1 ? 'flex:1; min-width:0;' : '';
+        html += `<div class="conseil-block ${isConflict ? 'conflict' : ''}" 
+          draggable="true" 
+          data-id="${item.id}"
+          ondragstart="onDragStart(event)"
+          onclick="openMoveModal('${item.id}')"
+          style="${flex}"
+          title="Cliquez pour déplacer ou voir les disponibilités">
+          <div class="class-label">🏫 ${item.className}</div>
+          <div class="profs-preview">${item.profs.map(p => '👤 ' + p).join('<br>')}</div>
+          ${isConflict ? '<div style="font-size:0.65rem;color:var(--rust);margin-top:3px;">⚠️ Conflit</div>' : ''}
+        </div>`;
+      });
+
+      if (items.length > 1) {
+        html += '</div>';
+      }
+
+      html += '</div></td>';
+    });
+    html += '</tr>';
+  }
+
+  html += '</tbody></table></div></div>';
+  el.innerHTML = html;
+
+  // Show export bar
+  const exportBar = document.getElementById('exportBar');
+  if (exportBar) {
+    exportBar.style.display = 'flex';
+    document.getElementById('exportDate').textContent = new Date().toLocaleDateString('fr-FR');
+  }
+
+  // Drag & drop on drop zones
+  document.querySelectorAll('.drop-zone').forEach(zone => {
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('drag-over');
+      const id = e.dataTransfer.getData('text/plain');
+      const dateId = zone.dataset.date;
+      const slotIndex = parseInt(zone.dataset.slot);
+      if (id) moveConseil(id, dateId, slotIndex, true);
+    });
+  });
+
+  renderScheduleStats();
+}
+
+function onDragStart(e) {
+  draggedItem = e.target.dataset.id;
+  e.dataTransfer.setData('text/plain', draggedItem);
+  e.target.classList.add('dragging');
+  setTimeout(() => e.target.classList.remove('dragging'), 0);
+}
+
+// ===================== MOVE MODAL =====================
+function openMoveModal(scheduleId) {
+  moveTarget = scheduleId;
+  const item = data.schedule.find(s => s.id === scheduleId);
+  if (!item) return;
+
+  const modal = document.getElementById('moveModal');
+  const content = document.getElementById('moveModalContent');
+
+  let html = `<div class="alert alert-info" style="margin-bottom:16px;">
+    <strong>🏫 ${item.className}</strong> — actuellement le ${formatDate(data.dates.find(d=>d.id===item.dateId)?.date || '')} à ${item.slotLabel}
+  </div>`;
+
+  // Current prof availability
+  html += `<h4 style="font-size:0.85rem; font-weight:700; margin-bottom:10px; color:var(--slate); text-transform:uppercase; letter-spacing:0.8px;">Professeurs du conseil</h4>
+  <div class="availability-grid">`;
+  item.profs.forEach(p => {
+    const blocked = isProfBlocked(p, item.dateId, item.slotStart, item.slotEnd);
+    const busy = data.schedule.filter(s => s.id !== scheduleId && s.dateId === item.dateId && s.slotIndex === item.slotIndex && s.profs.includes(p));
+    const ok = !blocked && !busy.length;
+    html += `<div class="avail-row">
+      <span class="avail-name">👤 ${p}</span>
+      ${ok ? '<span class="avail-ok">✓ Disponible</span>' : `<span class="avail-conflict">✗ ${blocked ? 'Contrainte horaire' : 'Autre conseil'}</span>`}
+    </div>`;
+  });
+  html += '</div>';
+
+  html += `<h4 style="font-size:0.85rem; font-weight:700; margin:18px 0 10px; color:var(--slate); text-transform:uppercase; letter-spacing:0.8px;">Choisir un nouveau créneau</h4>`;
+
+  // List all possible slots
+  const options = [];
+  data.dates.forEach(d => {
+    const slots = getSlots(d);
+    slots.forEach((sl, si) => {
+      const conflicts = item.profs.filter(p => isProfBlocked(p, d.id, sl.start, sl.end) || isProfBusy(p, d.id, si, scheduleId));
+      const isCurrent = d.id === item.dateId && si === item.slotIndex;
+      options.push({ dateId: d.id, slotIndex: si, slot: sl, date: d, conflicts, isCurrent });
+    });
+  });
+
+  html += '<div class="availability-grid" style="max-height:250px;">';
+  options.forEach((opt, i) => {
+    const statusClass = opt.conflicts.length === 0 ? 'status-ok' : (opt.conflicts.length < item.profs.length ? 'status-warn' : 'status-bad');
+    const statusText = opt.conflicts.length === 0 ? '✓ Tous disponibles' : `⚠️ ${opt.conflicts.length} conflit(s): ${opt.conflicts.join(', ')}`;
+    const current = opt.isCurrent ? ' (actuel)' : '';
+    html += `<div class="slot-option ${opt.isCurrent ? 'selected' : ''}" onclick="selectSlotOption(this, '${opt.dateId}', ${opt.slotIndex})">
+      <input type="radio" name="slotChoice" value="${i}" ${opt.isCurrent ? 'checked' : ''} style="display:none;">
+      <div class="slot-option-info">
+        <div class="slot-option-name">${formatDate(opt.date.date)}${current}</div>
+        <div class="slot-option-sub">${opt.slot.label}</div>
+      </div>
+      <div class="slot-status ${statusClass}">${statusText}</div>
+    </div>`;
+  });
+  html += '</div>';
+
+  content.innerHTML = html;
+  modal.style.display = 'flex';
+}
+
+function selectSlotOption(el, dateId, slotIndex) {
+  document.querySelectorAll('.slot-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  el._dateId = dateId;
+  el._slotIndex = slotIndex;
+  document.getElementById('btnConfirmMove')._dateId = dateId;
+  document.getElementById('btnConfirmMove')._slotIndex = slotIndex;
+}
+
+function confirmMove() {
+  const btn = document.getElementById('btnConfirmMove');
+  const dateId = btn._dateId;
+  const slotIndex = btn._slotIndex;
+  if (dateId === undefined || slotIndex === undefined) { alert('Veuillez sélectionner un créneau.'); return; }
+  moveConseil(moveTarget, dateId, slotIndex, false);
+  closeModal();
+}
+
+function moveConseil(scheduleId, dateId, slotIndex, silent) {
+  const item = data.schedule.find(s => s.id === scheduleId);
+  if (!item) return;
+
+  const dateObj = data.dates.find(d => d.id === dateId);
+  const slots = getSlots(dateObj);
+  const slot = slots[slotIndex];
+  if (!slot) return;
+
+  item.dateId = dateId;
+  item.slotIndex = slotIndex;
+  item.slotStart = slot.start;
+  item.slotEnd = slot.end;
+  item.slotLabel = slot.label;
+
+  renderSchedule();
+}
+
+function closeModal() {
+  document.getElementById('moveModal').style.display = 'none';
+  moveTarget = null;
+}
+
+// Close modal on overlay click
+document.getElementById('moveModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ===================== SESSIONS =====================
+const SESSION_KEY = 'conseilsClasse_sessions';
+
+function getSessions() {
+  try { return JSON.parse(localStorage.getItem(SESSION_KEY)) || []; }
+  catch(e) { return []; }
+}
+
+function saveSessions(sessions) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(sessions));
+  updateSessionCount();
+}
+
+function updateSessionCount() {
+  const sessions = getSessions();
+  const el = document.getElementById('sessionCount');
+  if (el) el.textContent = sessions.length || '';
+}
+
+function openDrawer() {
+  document.getElementById('sessionDrawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+  renderSessionList();
+}
+
+function closeDrawer() {
+  document.getElementById('sessionDrawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+}
+
+function saveSession() {
+  const nameInput = document.getElementById('sessionNameInput');
+  const name = nameInput.value.trim();
+  if (!name) { nameInput.focus(); showToast('⚠️ Donnez un nom à la session.'); return; }
+  if (!data.schedule.length && !data.classes.length) {
+    showToast('⚠️ Aucune donnée à sauvegarder.'); return;
+  }
+
+  const sessions = getSessions();
+
+  // Check if name already exists → ask to overwrite
+  const existingIdx = sessions.findIndex(s => s.name.toLowerCase() === name.toLowerCase());
+  if (existingIdx !== -1) {
+    if (!confirm(`Une session "${name}" existe déjà. Voulez-vous la remplacer ?`)) return;
+    sessions.splice(existingIdx, 1);
+  }
+
+  const session = {
+    id: uid(),
+    name,
+    createdAt: new Date().toISOString(),
+    stats: {
+      classes: data.classes.length,
+      scheduled: data.schedule.length,
+      dates: data.dates.length
+    },
+    data: JSON.parse(JSON.stringify(data)) // deep clone
+  };
+
+  sessions.unshift(session); // newest first
+  saveSessions(sessions);
+  nameInput.value = '';
+  renderSessionList();
+  showToast('✓ Session "' + name + '" sauvegardée !');
+}
+
+function loadSession(id) {
+  const sessions = getSessions();
+  const session = sessions.find(s => s.id === id);
+  if (!session) return;
+
+  if (data.schedule.length || data.classes.length) {
+    if (!confirm('Charger cette session remplacera les données actuelles. Continuer ?')) return;
+  }
+
+  data = JSON.parse(JSON.stringify(session.data));
+
+  // Re-render everything
+  renderDates();
+  renderClasses();
+  renderConstraints();
+  updateConstraintOptions();
+
+  if (data.schedule.length) {
+    renderSchedule();
+    renderScheduleStats();
+    renderMatieresSelector();
+  }
+
+  closeDrawer();
+  showToast('✓ Session "' + session.name + '" chargée !');
+
+  // Go to schedule if there is one
+  if (data.schedule.length) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-btn')[3].classList.add('active');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-schedule').classList.add('active');
+  } else {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-dates').classList.add('active');
+  }
+}
+
+function deleteSession(id) {
+  const sessions = getSessions();
+  const session = sessions.find(s => s.id === id);
+  if (!session) return;
+  if (!confirm(`Supprimer la session "${session.name}" ?`)) return;
+  saveSessions(sessions.filter(s => s.id !== id));
+  renderSessionList();
+  showToast('🗑️ Session supprimée.');
+}
+
+function renameSession(id) {
+  const sessions = getSessions();
+  const session = sessions.find(s => s.id === id);
+  if (!session) return;
+  const newName = prompt('Nouveau nom :', session.name);
+  if (!newName || !newName.trim()) return;
+  session.name = newName.trim();
+  saveSessions(sessions);
+  renderSessionList();
+}
+
+function renderSessionList() {
+  const el = document.getElementById('sessionList');
+  const sessions = getSessions();
+
+  if (!sessions.length) {
+    el.innerHTML = `<div class="empty-state" style="padding:40px 20px;">
+      <div class="big-icon">🗂️</div>
+      <p>Aucune session sauvegardée.<br>Générez un planning et sauvegardez-le ici.</p>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = sessions.map(s => {
+    const date = new Date(s.createdAt).toLocaleDateString('fr-FR', {
+      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    return `<div class="session-item" onclick="loadSession('${s.id}')">
+      <div class="session-item-header">
+        <div class="session-name">📋 ${s.name}</div>
+        <div class="session-actions" onclick="event.stopPropagation()">
+          <button class="session-action-btn load" onclick="loadSession('${s.id}')">↩ Charger</button>
+          <button class="session-action-btn" onclick="renameSession('${s.id}')">✏️</button>
+          <button class="session-action-btn del" onclick="deleteSession('${s.id}')">🗑️</button>
+        </div>
+      </div>
+      <div class="session-meta">
+        <span>🏫 ${s.stats.classes} classe(s)</span>
+        <span>📊 ${s.stats.scheduled} planifié(s)</span>
+        <span>📅 ${s.stats.dates} jour(s)</span>
+        <span style="margin-left:auto; opacity:0.7;">🕐 ${date}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showToast(msg) {
+  const existing = document.getElementById('sessionToast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = 'sessionToast';
+  toast.className = 'session-toast';
+  toast.innerHTML = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.4s'; setTimeout(() => toast.remove(), 400); }, 2800);
+}
+
+// ===================== INIT =====================
+renderDates();
+renderClasses();
+renderConstraints();
+updateSessionCount();
+setMaxPerSlot(1);
+
+function openRGPDModal() {
+  document.getElementById('rgpdModal').style.display = 'flex';
+}
+document.getElementById('rgpdModal').addEventListener('click', function(e) {
+  if (e.target === this) this.style.display = 'none';
+});
+
+// ===================== EXCEL IMPORT =====================
+let excelParsedData = []; // { className, prof }
+
+function excelDragOver(e) {
+  e.preventDefault();
+  document.getElementById('dropExcel').classList.add('drag-active');
+}
+function excelDragLeave(e) {
+  document.getElementById('dropExcel').classList.remove('drag-active');
+}
+function excelDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropExcel').classList.remove('drag-active');
+  const file = e.dataTransfer.files[0];
+  if (file) parseExcelFile(file);
+}
+function handleExcelFile(e) {
+  const file = e.target.files[0];
+  if (file) parseExcelFile(file);
+}
+
+function parseExcelFile(file) {
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data_ab = e.target.result;
+      const wb = XLSX.read(data_ab, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+      excelParsedData = []; // { className, prof, matiere }
+
+      if (rows.length < 2) {
+        renderExcelPreview(); return;
+      }
+
+      // Row 0 = headers: col 0 = "Matière" (ignored), col 1+ = class names
+      const headerRow = rows[0];
+      const classNames = [];
+      for (let c = 1; c < headerRow.length; c++) {
+        classNames.push(String(headerRow[c] || '').trim());
+      }
+
+      // Rows 1+ = data: col 0 = matière, col 1+ = prof per class
+      for (let r = 1; r < rows.length; r++) {
+        const row = rows[r];
+        const matiere = String(row[0] || '').trim();
+        for (let c = 0; c < classNames.length; c++) {
+          const className = classNames[c];
+          const prof = String(row[c + 1] || '').trim();
+          if (className && prof) {
+            excelParsedData.push({ className, prof, matiere });
+          }
+        }
+      }
+
+      renderExcelPreview();
+    } catch(err) {
+      document.getElementById('excelPreview').innerHTML =
+        `<div class="alert alert-error">❌ Erreur de lecture du fichier : ${err.message}</div>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function renderExcelPreview() {
+  const el = document.getElementById('excelPreview');
+  if (!excelParsedData.length) {
+    el.innerHTML = '<div class="alert alert-warn">⚠️ Aucune donnée trouvée. Vérifiez le format du fichier (colonne A = matière, colonne B = nom de classe puis professeurs).</div>';
+    return;
+  }
+
+  // Group by class
+  const grouped = {};
+  excelParsedData.forEach(r => {
+    if (!grouped[r.className]) grouped[r.className] = [];
+    const exists = grouped[r.className].find(x => x.prof === r.prof);
+    if (!exists) grouped[r.className].push({ prof: r.prof, matiere: r.matiere });
+  });
+
+  const classCount = Object.keys(grouped).length;
+  const profSet = new Set(excelParsedData.map(r => r.prof));
+
+  let html = `<div class="alert alert-success" style="margin-bottom:12px;">
+    ✓ Fichier analysé : <strong>${classCount} classe(s)</strong> et <strong>${profSet.size} professeur(s) uniques</strong> détectés.
+  </div>`;
+
+  html += `<div style="overflow:auto; max-height:300px; border-radius:var(--radius); border:1px solid var(--mist);">
+  <table class="preview-table">
+    <thead><tr><th>Classe</th><th>Matière</th><th>Professeur</th></tr></thead>
+    <tbody>`;
+
+  Object.entries(grouped).forEach(([cls, entries]) => {
+    entries.forEach((entry, i) => {
+      html += `<tr>
+        ${i === 0 ? `<td class="col-class" rowspan="${entries.length}" style="vertical-align:middle; border-right:2px solid var(--mist);">🏫 ${cls}</td>` : ''}
+        <td style="font-size:0.75rem; color:var(--slate); font-style:italic;">${entry.matiere || '—'}</td>
+        <td><span class="prof-tag">👤 ${entry.prof}</span></td>
+      </tr>`;
+    });
+  });
+
+  html += `</tbody></table></div>`;
+
+  html += `<div style="display:flex; gap:10px; margin-top:14px; align-items:center; flex-wrap:wrap;">
+    <button class="btn btn-forest" onclick="importExcelData(false)">➕ Ajouter aux classes existantes</button>
+    <button class="btn btn-primary" onclick="importExcelData(true)">🔄 Remplacer toutes les classes</button>
+    <span style="font-size:0.75rem; color:var(--slate);">Les doublons de classes seront fusionnés.</span>
+  </div>`;
+
+  el.innerHTML = html;
+}
+
+function importExcelData(replace) {
+  if (!excelParsedData.length) return;
+
+  if (replace) {
+    data.classes = [];
+    data.schedule = [];
+  }
+
+  // Group by class, storing { prof, matiere } entries
+  const grouped = {};
+  excelParsedData.forEach(r => {
+    if (!grouped[r.className]) grouped[r.className] = [];
+    const exists = grouped[r.className].find(x => x.prof === r.prof && x.matiere === r.matiere);
+    if (!exists) grouped[r.className].push({ prof: r.prof, matiere: r.matiere });
+  });
+
+  let added = 0, merged = 0;
+  Object.entries(grouped).forEach(([className, entries]) => {
+    const existing = data.classes.find(c => c.name.toLowerCase() === className.toLowerCase());
+    if (existing) {
+      entries.forEach(e => {
+        if (!existing.profEntries) existing.profEntries = [];
+        const dup = existing.profEntries.find(x => x.prof === e.prof && x.matiere === e.matiere);
+        if (!dup) existing.profEntries.push(e);
+        if (!existing.profs.includes(e.prof)) existing.profs.push(e.prof);
+      });
+      merged++;
+    } else {
+      const profs = [...new Set(entries.map(e => e.prof))];
+      data.classes.push({ id: uid(), name: className, profs, profEntries: entries, duration: null });
+      added++;
+    }
+  });
+
+  renderClasses();
+  updateConstraintOptions();
+  excelParsedData = [];
+  document.getElementById('excelPreview').innerHTML =
+    `<div class="alert alert-success">✓ Import terminé : <strong>${added}</strong> classe(s) ajoutée(s)${merged ? `, <strong>${merged}</strong> fusionnée(s)` : ''}.</div>`;
+}
+
+// ===================== BUILD EXPORT DATA =====================
+function buildScheduleByDate() {
+  // Returns sorted array of { date, dateLabel, items: [{slotLabel, className, profs}] }
+  const byDate = {};
+  data.schedule.forEach(s => {
+    if (!byDate[s.dateId]) {
+      const d = data.dates.find(x => x.id === s.dateId);
+      byDate[s.dateId] = { date: d.date, dateLabel: formatDate(d.date), items: [] };
+    }
+    byDate[s.dateId].items.push({ slotLabel: s.slotLabel, className: s.className, profs: s.profs });
+  });
+  // Sort by date then by slotLabel
+  return Object.values(byDate)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(d => ({ ...d, items: d.items.sort((a, b) => a.slotLabel.localeCompare(b.slotLabel)) }));
+}
+
+// ===================== EXPORT PDF =====================
+async function exportPDF() {
+  if (!data.schedule.length) { alert('Générez d\'abord un planning.'); return; }
+
+  const spin = document.getElementById('spinPDF');
+  spin.style.display = 'inline-block';
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 14;
+    let y = margin;
+
+    // Title
+    doc.setFillColor(26, 26, 46);
+    doc.rect(0, 0, pageW, 18, 'F');
+    doc.setTextColor(201, 168, 76);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Planning des Conseils de Classe', margin, 12);
+    doc.setFontSize(8);
+    doc.setTextColor(200, 200, 200);
+    doc.text('Généré le ' + new Date().toLocaleDateString('fr-FR'), pageW - margin, 12, { align: 'right' });
+
+    y = 26;
+
+    const byDate = buildScheduleByDate();
+    const colW = (pageW - margin * 2) / Math.min(byDate.length, 5);
+
+    // Group into rows of 5 columns
+    for (let gi = 0; gi < byDate.length; gi += 5) {
+      const group = byDate.slice(gi, gi + 5);
+      let maxH = 0;
+
+      // Draw date headers
+      group.forEach((day, ci) => {
+        const x = margin + ci * colW;
+        doc.setFillColor(45, 106, 79);
+        doc.roundedRect(x, y, colW - 3, 9, 2, 2, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'bold');
+        const label = day.dateLabel.replace(/^(\w+)\s/, '').substring(0, 28);
+        doc.text(label, x + (colW - 3) / 2, y + 6, { align: 'center', maxWidth: colW - 5 });
+      });
+
+      y += 11;
+
+      // Draw items
+      group.forEach((day, ci) => {
+        const x = margin + ci * colW;
+        let iy = y;
+        day.items.forEach(item => {
+          doc.setFillColor(240, 248, 244);
+          doc.setDrawColor(180, 220, 200);
+          doc.roundedRect(x, iy, colW - 3, 18, 1.5, 1.5, 'FD');
+
+          doc.setTextColor(26, 26, 46);
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'bold');
+          doc.text(item.className, x + 3, iy + 5.5);
+
+          doc.setFontSize(6.5);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(74, 85, 104);
+          doc.text(item.slotLabel, x + 3, iy + 10);
+
+          const profText = item.profs.slice(0, 3).join(', ') + (item.profs.length > 3 ? '…' : '');
+          doc.text(profText, x + 3, iy + 15, { maxWidth: colW - 6 });
+
+          iy += 21;
+        });
+        maxH = Math.max(maxH, day.items.length * 21);
+      });
+
+      y += maxH + 8;
+
+      // New page if needed
+      if (y > pageH - 20 && gi + 5 < byDate.length) {
+        doc.addPage();
+        y = margin;
+      }
+    }
+
+    doc.save('planning_conseils_de_classe.pdf');
+  } catch(e) {
+    alert('Erreur PDF : ' + e.message);
+  }
+  spin.style.display = 'none';
+}
+
+// ===================== EXPORT EXCEL =====================
+function exportExcel() {
+  if (!data.schedule.length) { alert('Générez d\'abord un planning.'); return; }
+
+  const spin = document.getElementById('spinXLSX');
+  spin.style.display = 'inline-block';
+
+  try {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Par date
+    const byDate = buildScheduleByDate();
+    const rows1 = [['Date', 'Créneau horaire', 'Classe', 'Professeurs']];
+    byDate.forEach(day => {
+      day.items.forEach(item => {
+        rows1.push([day.dateLabel, item.slotLabel, item.className, item.profs.join(', ')]);
+      });
+    });
+    const ws1 = XLSX.utils.aoa_to_sheet(rows1);
+    ws1['!cols'] = [{ wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 50 }];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Planning par date');
+
+    // Sheet 2: Par classe
+    const rows2 = [['Classe', 'Date', 'Créneau horaire', 'Professeurs']];
+    [...data.schedule]
+      .sort((a, b) => a.className.localeCompare(b.className))
+      .forEach(s => {
+        const d = data.dates.find(x => x.id === s.dateId);
+        rows2.push([s.className, formatDate(d.date), s.slotLabel, s.profs.join(', ')]);
+      });
+    const ws2 = XLSX.utils.aoa_to_sheet(rows2);
+    ws2['!cols'] = [{ wch: 16 }, { wch: 32 }, { wch: 18 }, { wch: 50 }];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Planning par classe');
+
+    // Style header rows (bold + fill) — basic
+    [ws1, ws2].forEach(ws => {
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cell = ws[XLSX.utils.encode_cell({ r: 0, c: C })];
+        if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: '1A1A2E' } }, fontColor: { rgb: 'C9A84C' } };
+      }
+    });
+
+    XLSX.writeFile(wb, 'planning_conseils_de_classe.xlsx');
+  } catch(e) {
+    alert('Erreur Excel : ' + e.message);
+  }
+  spin.style.display = 'none';
+}
+
+// ===================== EXPORT WORD (HTML) =====================
+function exportWord() {
+  if (!data.schedule.length) { alert('Générez d\'abord un planning.'); return; }
+
+  const spin = document.getElementById('spinWord');
+  spin.style.display = 'inline-block';
+
+  try {
+    const byDate = buildScheduleByDate();
+    const now = new Date().toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' });
+
+    let html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Planning Conseils de Classe</title>
+<style>
+  body { font-family: 'Calibri', Arial, sans-serif; margin: 30px; color: #1a1a2e; }
+  h1 { font-size: 22pt; color: #1a1a2e; border-bottom: 3px solid #c9a84c; padding-bottom: 8px; margin-bottom: 6px; }
+  .subtitle { font-size: 10pt; color: #888; margin-bottom: 28px; }
+  h2 { font-size: 13pt; background: #2d6a4f; color: white; padding: 7px 14px; border-radius: 4px; margin: 24px 0 10px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+  th { background: #1a1a2e; color: #e8d5a3; padding: 7px 12px; font-size: 9pt; text-align: left; }
+  td { padding: 7px 12px; border-bottom: 1px solid #e2ddd6; font-size: 10pt; vertical-align: top; }
+  tr:nth-child(even) td { background: #f5f0e8; }
+  .class-name { font-weight: bold; color: #2d6a4f; }
+  .slot { color: #888; font-size: 9pt; }
+  .profs { color: #4a5568; font-size: 9pt; }
+  .footer { margin-top: 40px; font-size: 8pt; color: #aaa; border-top: 1px solid #e2ddd6; padding-top: 10px; }
+  @media print { body { margin: 15mm; } h2 { break-before: auto; } }
+</style>
+</head>
+<body>
+<h1>Planning des Conseils de Classe</h1>
+<div class="subtitle">Généré le ${now} &nbsp;·&nbsp; ${data.schedule.length} conseil(s) planifié(s) sur ${byDate.length} journée(s)</div>`;
+
+    byDate.forEach(day => {
+      html += `<h2>${day.dateLabel}</h2>
+<table>
+  <thead><tr><th>Créneau</th><th>Classe</th><th>Professeurs</th></tr></thead>
+  <tbody>`;
+      day.items.forEach(item => {
+        html += `<tr>
+    <td class="slot">${item.slotLabel}</td>
+    <td class="class-name">${item.className}</td>
+    <td class="profs">${item.profs.join('<br>')}</td>
+  </tr>`;
+      });
+      html += `</tbody></table>`;
+    });
+
+    html += `<div class="footer">Document généré automatiquement par Conseils.Classe — ${now}</div>
+</body></html>`;
+
+    const blob = new Blob([html], { type: 'application/msword;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'planning_conseils_de_classe.doc';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    alert('Erreur Word : ' + e.message);
+  }
+  spin.style.display = 'none';
+}
+</script>
+</body>
+</html>
