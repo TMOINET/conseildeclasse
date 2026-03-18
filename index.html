@@ -4,8 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Planificateur de Conseils de Classe</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Bibliothèques intégrées localement pour conformité RGPD - voir README -->
+<script src="xlsx.full.min.js"></script>
+<script src="jspdf.umd.min.js"></script>
+<script src="html2canvas.min.js"></script>
 <style>
   :root {
     --ink: #1a1a2e;
@@ -22,12 +24,14 @@
     --shadow: rgba(26,26,46,0.12);
     --radius: 10px;
     --radius-lg: 18px;
+    --font-display: 'Georgia', 'Times New Roman', serif;
+    --font-body: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-body);
     background: var(--paper);
     color: var(--ink);
     min-height: 100vh;
@@ -51,7 +55,7 @@
   }
 
   header .logo {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-display);
     font-size: 1.6rem;
     font-weight: 700;
     letter-spacing: -0.5px;
@@ -79,7 +83,7 @@
     padding: 8px 20px;
     border-radius: 6px;
     cursor: pointer;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-body);
     font-size: 0.82rem;
     font-weight: 500;
     letter-spacing: 0.5px;
@@ -95,11 +99,11 @@
   .main {
     max-width: 1300px;
     margin: 0 auto;
-    padding: 30px 30px;
+    padding: 30px 30px 80px 30px;
   }
 
   .section-title {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-display);
     font-size: 1.4rem;
     font-weight: 600;
     color: var(--ink);
@@ -135,7 +139,7 @@
   }
 
   .card-title {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-display);
     font-size: 1.05rem;
     font-weight: 600;
     margin-bottom: 18px;
@@ -177,7 +181,7 @@
     padding: 10px 14px;
     border: 1.5px solid var(--mist);
     border-radius: var(--radius);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-body);
     font-size: 0.9rem;
     background: var(--paper);
     color: var(--ink);
@@ -197,7 +201,7 @@
     padding: 10px 22px;
     border: none;
     border-radius: var(--radius);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-body);
     font-size: 0.88rem;
     font-weight: 600;
     cursor: pointer;
@@ -462,7 +466,7 @@
   @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: none; opacity: 1; } }
 
   .modal-title {
-    font-family: 'Playfair Display', serif;
+    font-family: var(--font-display);
     font-size: 1.2rem;
     font-weight: 600;
     margin-bottom: 20px;
@@ -555,7 +559,7 @@
     flex-direction: column;
     gap: 2px;
   }
-  .stat-chip .stat-val { font-family: 'Playfair Display', serif; font-size: 1.5rem; font-weight: 700; color: var(--ink); }
+  .stat-chip .stat-val { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; color: var(--ink); }
   .stat-chip .stat-lab { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 1px; color: var(--slate); }
 
   /* EMPTY STATE */
@@ -705,6 +709,307 @@
   }
   .format-hint table th { background: var(--ink); color: var(--gold-light); }
 
+  /* EXPORT BAR */
+  .export-bar {
+    background: var(--ink);
+    border-radius: var(--radius-lg);
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+    border: 1px solid rgba(201,168,76,0.2);
+  }
+  .export-bar .export-label {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    color: var(--gold-light);
+    font-weight: 600;
+    margin-right: 6px;
+    white-space: nowrap;
+  }
+  .btn-export {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    border-radius: var(--radius);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .btn-export:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.25); }
+  .btn-export-pdf  { background: #e53e3e; color: white; }
+  .btn-export-xlsx { background: #276749; color: white; }
+  .btn-export-word { background: #2b6cb0; color: white; }
+  .btn-export-pdf:hover  { background: #c53030; }
+  .btn-export-xlsx:hover { background: #1e5239; }
+  .btn-export-word:hover { background: #2c5282; }
+
+  .export-spinner {
+    display: none;
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ===== SESSIONS ===== */
+  .session-btn {
+    background: rgba(201,168,76,0.15);
+    border: 1.5px solid rgba(201,168,76,0.35);
+    color: var(--gold-light);
+    padding: 7px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+  .session-btn:hover { background: rgba(201,168,76,0.28); border-color: var(--gold); color: var(--gold); }
+
+  .session-drawer {
+    position: fixed;
+    top: 0; right: -420px;
+    width: 400px;
+    height: 100vh;
+    background: var(--white);
+    border-left: 1px solid var(--mist);
+    box-shadow: -8px 0 40px rgba(26,26,46,0.18);
+    z-index: 500;
+    transition: right 0.35s cubic-bezier(.4,0,.2,1);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .session-drawer.open { right: 0; }
+
+  .drawer-header {
+    background: var(--ink);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid var(--gold);
+    flex-shrink: 0;
+  }
+  .drawer-header h3 {
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    color: var(--gold-light);
+    font-weight: 600;
+  }
+  .drawer-close {
+    background: none; border: none;
+    color: var(--gold-light); font-size: 1.3rem;
+    cursor: pointer; line-height: 1;
+    transition: color 0.15s;
+  }
+  .drawer-close:hover { color: var(--rust); }
+
+  .drawer-save {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--mist);
+    background: var(--cream);
+    flex-shrink: 0;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  .drawer-save input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1.5px solid var(--mist);
+    border-radius: 8px;
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    background: var(--white);
+    color: var(--ink);
+    outline: none;
+  }
+  .drawer-save input:focus { border-color: var(--gold); }
+
+  .drawer-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+  }
+
+  .session-item {
+    background: var(--paper);
+    border: 1.5px solid var(--mist);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    transition: border-color 0.2s;
+    cursor: pointer;
+  }
+  .session-item:hover { border-color: var(--gold); background: rgba(201,168,76,0.04); }
+  .session-item.active-session { border-color: var(--forest); background: rgba(45,106,79,0.05); }
+
+  .session-item-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+  }
+  .session-name {
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: var(--ink);
+    flex: 1;
+  }
+  .session-actions { display: flex; gap: 5px; flex-shrink: 0; }
+  .session-action-btn {
+    background: none;
+    border: 1px solid var(--mist);
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-size: 0.72rem;
+    cursor: pointer;
+    color: var(--slate);
+    transition: all 0.15s;
+    font-family: var(--font-body);
+  }
+  .session-action-btn:hover { background: var(--cream); }
+  .session-action-btn.load  { color: var(--forest); border-color: rgba(45,106,79,0.3); }
+  .session-action-btn.load:hover  { background: rgba(45,106,79,0.08); }
+  .session-action-btn.del   { color: var(--rust); border-color: rgba(192,80,58,0.3); }
+  .session-action-btn.del:hover   { background: rgba(192,80,58,0.08); }
+
+  .session-meta {
+    font-size: 0.72rem;
+    color: var(--slate);
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .session-meta span { display: flex; align-items: center; gap: 3px; }
+
+  .drawer-overlay {
+    position: fixed; inset: 0;
+    background: rgba(26,26,46,0.3);
+    z-index: 499;
+    display: none;
+    backdrop-filter: blur(2px);
+  }
+  .drawer-overlay.open { display: block; }
+
+  /* ===== RGPD BANNER ===== */
+  .rgpd-banner {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--ink);
+    border-top: 2px solid rgba(201,168,76,0.3);
+    padding: 10px 30px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.55);
+    z-index: 300;
+    box-shadow: 0 -4px 20px rgba(26,26,46,0.2);
+  }
+  .rgpd-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(45,106,79,0.25);
+    border: 1px solid rgba(45,106,79,0.4);
+    color: #52b788;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .rgpd-banner a {
+    color: var(--gold-light);
+    text-decoration: underline;
+    cursor: pointer;
+  }
+
+  /* ===== RGPD MODAL ===== */
+  .rgpd-modal-content {
+    max-width: 580px;
+  }
+  .rgpd-section {
+    margin-bottom: 18px;
+  }
+  .rgpd-section h4 {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .rgpd-section p {
+    font-size: 0.82rem;
+    color: var(--slate);
+    line-height: 1.6;
+  }
+  .rgpd-ok-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(45,106,79,0.07);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    border-left: 3px solid var(--forest);
+    font-size: 0.82rem;
+    color: var(--slate);
+  }
+  .rgpd-warn-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(201,168,76,0.08);
+    border-radius: 8px;
+    margin-bottom: 6px;
+    border-left: 3px solid var(--gold);
+    font-size: 0.82rem;
+    color: var(--slate);
+  }
+
+  .session-toast {
+    position: fixed;
+    bottom: 28px; right: 28px;
+    background: var(--ink);
+    color: var(--gold-light);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: var(--radius);
+    padding: 12px 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    z-index: 2000;
+    box-shadow: 0 8px 24px rgba(26,26,46,0.25);
+    animation: toastIn 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  @keyframes toastIn { from { opacity:0; transform: translateY(12px); } to { opacity:1; transform:none; } }
+
 </style>
 </head>
 <body>
@@ -720,9 +1025,84 @@
     <button class="tab-btn" onclick="showPanel('contraintes')">⚠️ Contraintes</button>
     <button class="tab-btn" onclick="showPanel('schedule')">📊 Planning</button>
   </div>
+  <button class="session-btn" onclick="openDrawer()">🗂️ Sessions <span id="sessionCount" style="background:rgba(201,168,76,0.25);border-radius:10px;padding:1px 7px;font-size:0.72rem;"></span></button>
 </header>
 
+<!-- SESSION DRAWER OVERLAY -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+
+<!-- SESSION DRAWER -->
+<div class="session-drawer" id="sessionDrawer">
+  <div class="drawer-header">
+    <h3>🗂️ Sessions sauvegardées</h3>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div class="drawer-save">
+    <input type="text" id="sessionNameInput" placeholder="Nom de la session (ex: Trimestre 1 2025)…" onkeydown="if(event.key==='Enter') saveSession()">
+    <button class="btn btn-gold btn-sm" onclick="saveSession()" style="white-space:nowrap;">💾 Sauvegarder</button>
+  </div>
+  <div class="drawer-body" id="sessionList">
+    <div class="empty-state" style="padding:40px 20px;">
+      <div class="big-icon">🗂️</div>
+      <p>Aucune session sauvegardée.<br>Générez un planning et sauvegardez-le ici.</p>
+    </div>
+  </div>
+</div>
+
 <div class="main">
+
+<!-- RGPD BANNER (fixed at bottom) -->
+<div class="rgpd-banner" id="rgpdBanner">
+  <span class="rgpd-badge">🛡️ RGPD Conforme</span>
+  <span>Aucune donnée personnelle n'est transmise à des serveurs externes. Toutes les données restent sur votre appareil.</span>
+  <a onclick="openRGPDModal()">En savoir plus</a>
+  <button onclick="document.getElementById('rgpdBanner').style.display='none'"
+    style="margin-left:auto; background:none; border:none; color:rgba(255,255,255,0.4); cursor:pointer; font-size:1rem;">✕</button>
+</div>
+
+<!-- RGPD MODAL -->
+<div id="rgpdModal" class="modal-overlay" style="display:none;">
+  <div class="modal rgpd-modal-content">
+    <div class="modal-title">
+      <span>🛡️ Politique de confidentialité & RGPD</span>
+      <button class="modal-close" onclick="document.getElementById('rgpdModal').style.display='none'">✕</button>
+    </div>
+
+    <div class="rgpd-section">
+      <h4>📋 Données traitées</h4>
+      <p>Cet outil traite des <strong>données professionnelles</strong> : noms de classes, noms de professeurs, horaires et plannings. Ces données peuvent constituer des données à caractère personnel au sens du RGPD (Règlement UE 2016/679).</p>
+    </div>
+
+    <div class="rgpd-section">
+      <h4>✅ Ce que cet outil garantit</h4>
+      <div class="rgpd-ok-row">✓ <span><strong>Aucun serveur externe</strong> — toutes les données restent dans votre navigateur, sur votre appareil uniquement.</span></div>
+      <div class="rgpd-ok-row">✓ <span><strong>Aucun cookie de tracking</strong> — pas de publicité, pas d'analytics, pas de profiling.</span></div>
+      <div class="rgpd-ok-row">✓ <span><strong>Stockage local uniquement</strong> — les sessions sauvegardées utilisent le localStorage de votre navigateur. Elles ne sont accessibles qu'à vous.</span></div>
+      <div class="rgpd-ok-row">✓ <span><strong>Aucune transmission à des tiers</strong> — les données ne sont ni vendues, ni partagées, ni exploitées commercialement.</span></div>
+      <div class="rgpd-ok-row">✓ <span><strong>Fonctionnement hors ligne</strong> — le site peut fonctionner sans connexion internet une fois chargé.</span></div>
+    </div>
+
+    <div class="rgpd-section">
+      <h4>⚠️ Points d'attention</h4>
+      <div class="rgpd-warn-row">⚠️ <span><strong>Bibliothèques JavaScript</strong> — pour fonctionner, ce site charge des bibliothèques depuis des serveurs CDN externes (Cloudflare). Votre adresse IP peut être transmise lors du chargement. Pour un usage 100% autonome, téléchargez les fichiers JS en local.</span></div>
+      <div class="rgpd-warn-row">⚠️ <span><strong>Responsabilité du responsable de traitement</strong> — l'établissement qui utilise cet outil est responsable du traitement des données saisies. Il lui appartient d'informer les personnes concernées (professeurs) conformément à l'article 13 du RGPD.</span></div>
+    </div>
+
+    <div class="rgpd-section">
+      <h4>🏫 Base légale</h4>
+      <p>L'utilisation de cet outil dans le cadre de la gestion des conseils de classe relève de <strong>l'exécution d'une mission d'intérêt public</strong> (article 6.1.e du RGPD), dans le cadre des missions de l'Éducation Nationale.</p>
+    </div>
+
+    <div class="rgpd-section">
+      <h4>🗑️ Suppression des données</h4>
+      <p>Pour effacer toutes les données stockées sur votre appareil : videz le localStorage de votre navigateur pour ce site, ou utilisez la navigation privée. Les sessions peuvent être supprimées individuellement depuis le panneau <strong>🗂️ Sessions</strong>.</p>
+    </div>
+
+    <div style="margin-top:20px; text-align:right;">
+      <button class="btn btn-primary btn-sm" onclick="document.getElementById('rgpdModal').style.display='none'">✓ Compris</button>
+    </div>
+  </div>
+</div>
 
   <!-- =================== PANEL DATES =================== -->
   <div id="panel-dates" class="panel active">
@@ -916,6 +1296,15 @@
       <div id="scheduleStats" class="stats-bar"></div>
       <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
         <div style="display:flex; align-items:center; gap:10px; background:var(--cream); border:1.5px solid var(--mist); border-radius:var(--radius); padding:8px 14px;">
+          <label style="margin:0; font-size:0.78rem; font-weight:600; text-transform:uppercase; letter-spacing:0.8px; color:var(--slate); white-space:nowrap;">Conseils / créneau</label>
+          <div style="display:flex; gap:5px;">
+            <button id="slotBtn1" onclick="setMaxPerSlot(1)"
+              style="width:36px; height:32px; border-radius:6px; border:1.5px solid var(--forest); background:var(--forest); color:white; font-weight:700; font-size:0.9rem; cursor:pointer; transition:all 0.15s;">1</button>
+            <button id="slotBtn2" onclick="setMaxPerSlot(2)"
+              style="width:36px; height:32px; border-radius:6px; border:1.5px solid var(--mist); background:var(--white); color:var(--slate); font-weight:700; font-size:0.9rem; cursor:pointer; transition:all 0.15s;">2</button>
+          </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; background:var(--cream); border:1.5px solid var(--mist); border-radius:var(--radius); padding:8px 14px;">
           <label style="margin:0; font-size:0.78rem; font-weight:600; text-transform:uppercase; letter-spacing:0.8px; color:var(--slate); white-space:nowrap;">Max conseils / soir</label>
           <input type="number" id="inputMaxPerDay" value="" min="1" placeholder="∞"
             style="width:60px; padding:4px 8px; font-size:0.9rem; font-weight:700; text-align:center; background:var(--white); border:1.5px solid var(--mist); border-radius:6px; color:var(--ink);"
@@ -929,11 +1318,30 @@
     <div id="scheduleLegend" style="display:none;" class="legend">
       <div class="legend-item"><div class="legend-dot" style="background:rgba(45,106,79,0.4);border:1.5px solid rgba(45,106,79,0.5);"></div> Conseil planifié</div>
       <div class="legend-item"><div class="legend-dot" style="background:rgba(192,80,58,0.3);border:1.5px solid rgba(192,80,58,0.4);"></div> Conflit détecté</div>
+      <div class="legend-item" id="legendSlot2" style="display:none;"><div class="legend-dot" style="background:rgba(45,106,79,0.15);border:1.5px dashed rgba(45,106,79,0.4);"></div> 2 conseils en parallèle</div>
       <div class="legend-item" style="font-style:italic; font-size:0.75rem; color:var(--slate);">💡 Cliquez sur un conseil pour le déplacer</div>
     </div>
 
     <div id="scheduleContent" style="margin-top:20px;">
       <div class="empty-state card"><div class="big-icon">📊</div><p>Configurez les dates et les classes, puis cliquez sur <strong>Générer le planning</strong>.</p></div>
+    </div>
+
+    <!-- EXPORT BAR -->
+    <div class="export-bar" id="exportBar" style="display:none;">
+      <span class="export-label">⬇️ Télécharger le planning</span>
+      <button class="btn-export btn-export-pdf" onclick="exportPDF()">
+        <span>📄</span> PDF
+        <span class="export-spinner" id="spinPDF"></span>
+      </button>
+      <button class="btn-export btn-export-xlsx" onclick="exportExcel()">
+        <span>📊</span> Excel (.xlsx)
+        <span class="export-spinner" id="spinXLSX"></span>
+      </button>
+      <button class="btn-export btn-export-word" onclick="exportWord()">
+        <span>📝</span> Word (.html)
+        <span class="export-spinner" id="spinWord"></span>
+      </button>
+      <span style="font-size:0.72rem; color:rgba(255,255,255,0.4); margin-left:auto;">Planning généré le <span id="exportDate"></span></span>
     </div>
   </div>
 
@@ -965,6 +1373,7 @@ let data = {
 
 let tempProfs = [];
 let draggedItem = null;
+let maxPerSlot = 1; // 1 or 2 conseils per time slot
 let moveTarget = null; // { scheduleId }
 
 // ===================== UTILS =====================
@@ -1352,6 +1761,16 @@ function getClassDuration(classObj, dateObj) {
   return classObj.duration || dateObj.duration;
 }
 
+function setMaxPerSlot(n) {
+  maxPerSlot = n;
+  document.getElementById('slotBtn1').style.background = n === 1 ? 'var(--forest)' : 'var(--white)';
+  document.getElementById('slotBtn1').style.color = n === 1 ? 'white' : 'var(--slate)';
+  document.getElementById('slotBtn1').style.borderColor = n === 1 ? 'var(--forest)' : 'var(--mist)';
+  document.getElementById('slotBtn2').style.background = n === 2 ? 'var(--forest)' : 'var(--white)';
+  document.getElementById('slotBtn2').style.color = n === 2 ? 'white' : 'var(--slate)';
+  document.getElementById('slotBtn2').style.borderColor = n === 2 ? 'var(--forest)' : 'var(--mist)';
+}
+
 function generateSchedule() {
   if (!data.dates.length) { alert('Ajoutez d\'abord une période de dates.'); return; }
   if (!data.classes.length) { alert('Ajoutez d\'abord des classes.'); return; }
@@ -1366,20 +1785,25 @@ function generateSchedule() {
 
   data.schedule = [];
 
-  // Track how many conseils are placed per date
+  // Track how many conseils per date AND per slot
   const countPerDate = {};
+  const countPerSlot = {}; // key: "dateId_slotIdx"
   data.dates.forEach(d => { countPerDate[d.id] = 0; });
+
+  const slotKey = (dateId, slotIdx) => `${dateId}_${slotIdx}`;
+  const getSlotCount = (dateId, slotIdx) => countPerSlot[slotKey(dateId, slotIdx)] || 0;
 
   // Build all available slots per date
   const allSlots = {};
   data.dates.forEach(d => { allSlots[d.id] = getSlots(d); });
 
-  // Score a slot for a class based on ACTIVE profs only
-  // Heavily penalize dates that are already at the max
   function scoreSlot(classObj, dateId, slotIdx) {
     const slot = allSlots[dateId][slotIdx];
     const activeProfs = getActiveProfsForClass(classObj);
     let score = 0;
+
+    // Hard penalty if slot is already full (maxPerSlot reached)
+    if (getSlotCount(dateId, slotIdx) >= maxPerSlot) score += 50000;
 
     // Hard penalty if date is full
     if (countPerDate[dateId] >= maxPerDay) score += 10000;
@@ -1389,7 +1813,7 @@ function generateSchedule() {
       if (isProfBusy(p, dateId, slotIdx)) score += 10;
     });
 
-    // Slight preference for spreading across dates (prefer less-loaded dates)
+    // Slight preference for spreading across dates
     score += countPerDate[dateId] * 0.1;
 
     return score;
@@ -1430,6 +1854,8 @@ function generateSchedule() {
         slotLabel: best.slot.label
       });
       countPerDate[best.dateId]++;
+      const k = slotKey(best.dateId, best.slotIndex);
+      countPerSlot[k] = (countPerSlot[k] || 0) + 1;
     }
   }
 
@@ -1488,6 +1914,8 @@ function renderSchedule() {
   }
 
   legend.style.display = 'flex';
+  const leg2 = document.getElementById('legendSlot2');
+  if (leg2) leg2.style.display = maxPerSlot === 2 ? 'flex' : 'none';
   const conflicts = detectConflicts();
   const conflictIds = new Set(conflicts.map(c => c.scheduleId));
 
@@ -1539,19 +1967,32 @@ function renderSchedule() {
       }
       const items = data.schedule.filter(s => s.dateId === d.id && s.slotIndex === si);
       html += '<td><div class="drop-zone" data-date="' + d.id + '" data-slot="' + si + '">';
+
+      // If 2 items in this slot, display them side by side
+      if (items.length > 1) {
+        html += '<div style="display:flex; gap:4px;">';
+      }
+
       items.forEach(item => {
         const isConflict = conflictIds.has(item.id);
+        const flex = items.length > 1 ? 'flex:1; min-width:0;' : '';
         html += `<div class="conseil-block ${isConflict ? 'conflict' : ''}" 
           draggable="true" 
           data-id="${item.id}"
           ondragstart="onDragStart(event)"
           onclick="openMoveModal('${item.id}')"
+          style="${flex}"
           title="Cliquez pour déplacer ou voir les disponibilités">
           <div class="class-label">🏫 ${item.className}</div>
           <div class="profs-preview">${item.profs.map(p => '👤 ' + p).join('<br>')}</div>
           ${isConflict ? '<div style="font-size:0.65rem;color:var(--rust);margin-top:3px;">⚠️ Conflit</div>' : ''}
         </div>`;
       });
+
+      if (items.length > 1) {
+        html += '</div>';
+      }
+
       html += '</div></td>';
     });
     html += '</tr>';
@@ -1559,6 +2000,13 @@ function renderSchedule() {
 
   html += '</tbody></table></div></div>';
   el.innerHTML = html;
+
+  // Show export bar
+  const exportBar = document.getElementById('exportBar');
+  if (exportBar) {
+    exportBar.style.display = 'flex';
+    document.getElementById('exportDate').textContent = new Date().toLocaleDateString('fr-FR');
+  }
 
   // Drag & drop on drop zones
   document.querySelectorAll('.drop-zone').forEach(zone => {
@@ -1690,10 +2138,192 @@ document.getElementById('moveModal').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
 });
 
+// ===================== SESSIONS =====================
+const SESSION_KEY = 'conseilsClasse_sessions';
+
+function getSessions() {
+  try { return JSON.parse(localStorage.getItem(SESSION_KEY)) || []; }
+  catch(e) { return []; }
+}
+
+function saveSessions(sessions) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(sessions));
+  updateSessionCount();
+}
+
+function updateSessionCount() {
+  const sessions = getSessions();
+  const el = document.getElementById('sessionCount');
+  if (el) el.textContent = sessions.length || '';
+}
+
+function openDrawer() {
+  document.getElementById('sessionDrawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+  renderSessionList();
+}
+
+function closeDrawer() {
+  document.getElementById('sessionDrawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+}
+
+function saveSession() {
+  const nameInput = document.getElementById('sessionNameInput');
+  const name = nameInput.value.trim();
+  if (!name) { nameInput.focus(); showToast('⚠️ Donnez un nom à la session.'); return; }
+  if (!data.schedule.length && !data.classes.length) {
+    showToast('⚠️ Aucune donnée à sauvegarder.'); return;
+  }
+
+  const sessions = getSessions();
+
+  // Check if name already exists → ask to overwrite
+  const existingIdx = sessions.findIndex(s => s.name.toLowerCase() === name.toLowerCase());
+  if (existingIdx !== -1) {
+    if (!confirm(`Une session "${name}" existe déjà. Voulez-vous la remplacer ?`)) return;
+    sessions.splice(existingIdx, 1);
+  }
+
+  const session = {
+    id: uid(),
+    name,
+    createdAt: new Date().toISOString(),
+    stats: {
+      classes: data.classes.length,
+      scheduled: data.schedule.length,
+      dates: data.dates.length
+    },
+    data: JSON.parse(JSON.stringify(data)) // deep clone
+  };
+
+  sessions.unshift(session); // newest first
+  saveSessions(sessions);
+  nameInput.value = '';
+  renderSessionList();
+  showToast('✓ Session "' + name + '" sauvegardée !');
+}
+
+function loadSession(id) {
+  const sessions = getSessions();
+  const session = sessions.find(s => s.id === id);
+  if (!session) return;
+
+  if (data.schedule.length || data.classes.length) {
+    if (!confirm('Charger cette session remplacera les données actuelles. Continuer ?')) return;
+  }
+
+  data = JSON.parse(JSON.stringify(session.data));
+
+  // Re-render everything
+  renderDates();
+  renderClasses();
+  renderConstraints();
+  updateConstraintOptions();
+
+  if (data.schedule.length) {
+    renderSchedule();
+    renderScheduleStats();
+    renderMatieresSelector();
+  }
+
+  closeDrawer();
+  showToast('✓ Session "' + session.name + '" chargée !');
+
+  // Go to schedule if there is one
+  if (data.schedule.length) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-btn')[3].classList.add('active');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-schedule').classList.add('active');
+  } else {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-btn')[0].classList.add('active');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-dates').classList.add('active');
+  }
+}
+
+function deleteSession(id) {
+  const sessions = getSessions();
+  const session = sessions.find(s => s.id === id);
+  if (!session) return;
+  if (!confirm(`Supprimer la session "${session.name}" ?`)) return;
+  saveSessions(sessions.filter(s => s.id !== id));
+  renderSessionList();
+  showToast('🗑️ Session supprimée.');
+}
+
+function renameSession(id) {
+  const sessions = getSessions();
+  const session = sessions.find(s => s.id === id);
+  if (!session) return;
+  const newName = prompt('Nouveau nom :', session.name);
+  if (!newName || !newName.trim()) return;
+  session.name = newName.trim();
+  saveSessions(sessions);
+  renderSessionList();
+}
+
+function renderSessionList() {
+  const el = document.getElementById('sessionList');
+  const sessions = getSessions();
+
+  if (!sessions.length) {
+    el.innerHTML = `<div class="empty-state" style="padding:40px 20px;">
+      <div class="big-icon">🗂️</div>
+      <p>Aucune session sauvegardée.<br>Générez un planning et sauvegardez-le ici.</p>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = sessions.map(s => {
+    const date = new Date(s.createdAt).toLocaleDateString('fr-FR', {
+      day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+    });
+    return `<div class="session-item" onclick="loadSession('${s.id}')">
+      <div class="session-item-header">
+        <div class="session-name">📋 ${s.name}</div>
+        <div class="session-actions" onclick="event.stopPropagation()">
+          <button class="session-action-btn load" onclick="loadSession('${s.id}')">↩ Charger</button>
+          <button class="session-action-btn" onclick="renameSession('${s.id}')">✏️</button>
+          <button class="session-action-btn del" onclick="deleteSession('${s.id}')">🗑️</button>
+        </div>
+      </div>
+      <div class="session-meta">
+        <span>🏫 ${s.stats.classes} classe(s)</span>
+        <span>📊 ${s.stats.scheduled} planifié(s)</span>
+        <span>📅 ${s.stats.dates} jour(s)</span>
+        <span style="margin-left:auto; opacity:0.7;">🕐 ${date}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function showToast(msg) {
+  const existing = document.getElementById('sessionToast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.id = 'sessionToast';
+  toast.className = 'session-toast';
+  toast.innerHTML = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; toast.style.transition = 'opacity 0.4s'; setTimeout(() => toast.remove(), 400); }, 2800);
+}
+
 // ===================== INIT =====================
 renderDates();
 renderClasses();
 renderConstraints();
+updateSessionCount();
+setMaxPerSlot(1);
+
+function openRGPDModal() {
+  document.getElementById('rgpdModal').style.display = 'flex';
+}
+document.getElementById('rgpdModal').addEventListener('click', function(e) {
+  if (e.target === this) this.style.display = 'none';
+});
 
 // ===================== EXCEL IMPORT =====================
 let excelParsedData = []; // { className, prof }
@@ -1847,6 +2477,234 @@ function importExcelData(replace) {
   excelParsedData = [];
   document.getElementById('excelPreview').innerHTML =
     `<div class="alert alert-success">✓ Import terminé : <strong>${added}</strong> classe(s) ajoutée(s)${merged ? `, <strong>${merged}</strong> fusionnée(s)` : ''}.</div>`;
+}
+
+// ===================== BUILD EXPORT DATA =====================
+function buildScheduleByDate() {
+  // Returns sorted array of { date, dateLabel, items: [{slotLabel, className, profs}] }
+  const byDate = {};
+  data.schedule.forEach(s => {
+    if (!byDate[s.dateId]) {
+      const d = data.dates.find(x => x.id === s.dateId);
+      byDate[s.dateId] = { date: d.date, dateLabel: formatDate(d.date), items: [] };
+    }
+    byDate[s.dateId].items.push({ slotLabel: s.slotLabel, className: s.className, profs: s.profs });
+  });
+  // Sort by date then by slotLabel
+  return Object.values(byDate)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(d => ({ ...d, items: d.items.sort((a, b) => a.slotLabel.localeCompare(b.slotLabel)) }));
+}
+
+// ===================== EXPORT PDF =====================
+async function exportPDF() {
+  if (!data.schedule.length) { alert('Générez d\'abord un planning.'); return; }
+
+  const spin = document.getElementById('spinPDF');
+  spin.style.display = 'inline-block';
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 14;
+    let y = margin;
+
+    // Title
+    doc.setFillColor(26, 26, 46);
+    doc.rect(0, 0, pageW, 18, 'F');
+    doc.setTextColor(201, 168, 76);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Planning des Conseils de Classe', margin, 12);
+    doc.setFontSize(8);
+    doc.setTextColor(200, 200, 200);
+    doc.text('Généré le ' + new Date().toLocaleDateString('fr-FR'), pageW - margin, 12, { align: 'right' });
+
+    y = 26;
+
+    const byDate = buildScheduleByDate();
+    const colW = (pageW - margin * 2) / Math.min(byDate.length, 5);
+
+    // Group into rows of 5 columns
+    for (let gi = 0; gi < byDate.length; gi += 5) {
+      const group = byDate.slice(gi, gi + 5);
+      let maxH = 0;
+
+      // Draw date headers
+      group.forEach((day, ci) => {
+        const x = margin + ci * colW;
+        doc.setFillColor(45, 106, 79);
+        doc.roundedRect(x, y, colW - 3, 9, 2, 2, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(7.5);
+        doc.setFont('helvetica', 'bold');
+        const label = day.dateLabel.replace(/^(\w+)\s/, '').substring(0, 28);
+        doc.text(label, x + (colW - 3) / 2, y + 6, { align: 'center', maxWidth: colW - 5 });
+      });
+
+      y += 11;
+
+      // Draw items
+      group.forEach((day, ci) => {
+        const x = margin + ci * colW;
+        let iy = y;
+        day.items.forEach(item => {
+          doc.setFillColor(240, 248, 244);
+          doc.setDrawColor(180, 220, 200);
+          doc.roundedRect(x, iy, colW - 3, 18, 1.5, 1.5, 'FD');
+
+          doc.setTextColor(26, 26, 46);
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'bold');
+          doc.text(item.className, x + 3, iy + 5.5);
+
+          doc.setFontSize(6.5);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(74, 85, 104);
+          doc.text(item.slotLabel, x + 3, iy + 10);
+
+          const profText = item.profs.slice(0, 3).join(', ') + (item.profs.length > 3 ? '…' : '');
+          doc.text(profText, x + 3, iy + 15, { maxWidth: colW - 6 });
+
+          iy += 21;
+        });
+        maxH = Math.max(maxH, day.items.length * 21);
+      });
+
+      y += maxH + 8;
+
+      // New page if needed
+      if (y > pageH - 20 && gi + 5 < byDate.length) {
+        doc.addPage();
+        y = margin;
+      }
+    }
+
+    doc.save('planning_conseils_de_classe.pdf');
+  } catch(e) {
+    alert('Erreur PDF : ' + e.message);
+  }
+  spin.style.display = 'none';
+}
+
+// ===================== EXPORT EXCEL =====================
+function exportExcel() {
+  if (!data.schedule.length) { alert('Générez d\'abord un planning.'); return; }
+
+  const spin = document.getElementById('spinXLSX');
+  spin.style.display = 'inline-block';
+
+  try {
+    const wb = XLSX.utils.book_new();
+
+    // Sheet 1: Par date
+    const byDate = buildScheduleByDate();
+    const rows1 = [['Date', 'Créneau horaire', 'Classe', 'Professeurs']];
+    byDate.forEach(day => {
+      day.items.forEach(item => {
+        rows1.push([day.dateLabel, item.slotLabel, item.className, item.profs.join(', ')]);
+      });
+    });
+    const ws1 = XLSX.utils.aoa_to_sheet(rows1);
+    ws1['!cols'] = [{ wch: 32 }, { wch: 18 }, { wch: 16 }, { wch: 50 }];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Planning par date');
+
+    // Sheet 2: Par classe
+    const rows2 = [['Classe', 'Date', 'Créneau horaire', 'Professeurs']];
+    [...data.schedule]
+      .sort((a, b) => a.className.localeCompare(b.className))
+      .forEach(s => {
+        const d = data.dates.find(x => x.id === s.dateId);
+        rows2.push([s.className, formatDate(d.date), s.slotLabel, s.profs.join(', ')]);
+      });
+    const ws2 = XLSX.utils.aoa_to_sheet(rows2);
+    ws2['!cols'] = [{ wch: 16 }, { wch: 32 }, { wch: 18 }, { wch: 50 }];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Planning par classe');
+
+    // Style header rows (bold + fill) — basic
+    [ws1, ws2].forEach(ws => {
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cell = ws[XLSX.utils.encode_cell({ r: 0, c: C })];
+        if (cell) cell.s = { font: { bold: true }, fill: { fgColor: { rgb: '1A1A2E' } }, fontColor: { rgb: 'C9A84C' } };
+      }
+    });
+
+    XLSX.writeFile(wb, 'planning_conseils_de_classe.xlsx');
+  } catch(e) {
+    alert('Erreur Excel : ' + e.message);
+  }
+  spin.style.display = 'none';
+}
+
+// ===================== EXPORT WORD (HTML) =====================
+function exportWord() {
+  if (!data.schedule.length) { alert('Générez d\'abord un planning.'); return; }
+
+  const spin = document.getElementById('spinWord');
+  spin.style.display = 'inline-block';
+
+  try {
+    const byDate = buildScheduleByDate();
+    const now = new Date().toLocaleDateString('fr-FR', { day:'numeric', month:'long', year:'numeric' });
+
+    let html = `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Planning Conseils de Classe</title>
+<style>
+  body { font-family: 'Calibri', Arial, sans-serif; margin: 30px; color: #1a1a2e; }
+  h1 { font-size: 22pt; color: #1a1a2e; border-bottom: 3px solid #c9a84c; padding-bottom: 8px; margin-bottom: 6px; }
+  .subtitle { font-size: 10pt; color: #888; margin-bottom: 28px; }
+  h2 { font-size: 13pt; background: #2d6a4f; color: white; padding: 7px 14px; border-radius: 4px; margin: 24px 0 10px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+  th { background: #1a1a2e; color: #e8d5a3; padding: 7px 12px; font-size: 9pt; text-align: left; }
+  td { padding: 7px 12px; border-bottom: 1px solid #e2ddd6; font-size: 10pt; vertical-align: top; }
+  tr:nth-child(even) td { background: #f5f0e8; }
+  .class-name { font-weight: bold; color: #2d6a4f; }
+  .slot { color: #888; font-size: 9pt; }
+  .profs { color: #4a5568; font-size: 9pt; }
+  .footer { margin-top: 40px; font-size: 8pt; color: #aaa; border-top: 1px solid #e2ddd6; padding-top: 10px; }
+  @media print { body { margin: 15mm; } h2 { break-before: auto; } }
+</style>
+</head>
+<body>
+<h1>Planning des Conseils de Classe</h1>
+<div class="subtitle">Généré le ${now} &nbsp;·&nbsp; ${data.schedule.length} conseil(s) planifié(s) sur ${byDate.length} journée(s)</div>`;
+
+    byDate.forEach(day => {
+      html += `<h2>${day.dateLabel}</h2>
+<table>
+  <thead><tr><th>Créneau</th><th>Classe</th><th>Professeurs</th></tr></thead>
+  <tbody>`;
+      day.items.forEach(item => {
+        html += `<tr>
+    <td class="slot">${item.slotLabel}</td>
+    <td class="class-name">${item.className}</td>
+    <td class="profs">${item.profs.join('<br>')}</td>
+  </tr>`;
+      });
+      html += `</tbody></table>`;
+    });
+
+    html += `<div class="footer">Document généré automatiquement par Conseils.Classe — ${now}</div>
+</body></html>`;
+
+    const blob = new Blob([html], { type: 'application/msword;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'planning_conseils_de_classe.doc';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    alert('Erreur Word : ' + e.message);
+  }
+  spin.style.display = 'none';
 }
 </script>
 </body>
